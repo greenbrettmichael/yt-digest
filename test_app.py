@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from types import SimpleNamespace
-from youtube_transcript_api import TranscriptsDisabled, NoTranscriptFound
+from youtube_transcript_api import TranscriptsDisabled
 
 from app import get_transcript_api, get_recent_transcripts
 

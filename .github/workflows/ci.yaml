@@ -27,7 +27,6 @@ jobs:
         with:
           activate-environment: yt_digest
           environment-file: environment.yaml
-          python-version: "3.10"
           auto-activate-base: false
 
       - name: Run pytest
