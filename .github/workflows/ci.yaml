@@ -31,7 +31,7 @@ jobs:
 
       - name: Run pytest
         run: |
-          pytest test_app.py -v --junitxml=test-results.xml
+          pytest -v --junitxml=test-results.xml
 
       - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action@v2
