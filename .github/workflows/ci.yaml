@@ -30,7 +30,7 @@ jobs:
           python-version: "3.10"
           auto-activate-base: false
 
-      - name: Run Pytests
+      - name: Run pytest
         run: |
           pytest test_app.py -v --junitxml=test-results.xml
 
