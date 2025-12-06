@@ -1,3 +1,4 @@
+import json
 import os
 import scrapetube
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
@@ -101,6 +102,23 @@ def get_recent_transcripts(keyword: str, limit: int = 10, api_client: YouTubeTra
 
     return results_data
 
+def save_results_to_json(results: list, filename: str):
+    """
+    Saves the list of transcript dictionaries to a JSON file.
+    
+    Args:
+        results (list): The list of dictionaries from get_recent_transcripts.
+        filename (str): The output filename.
+    """
+    try:
+        with open(filename, 'w', encoding='utf-8') as f:
+            # indent=4 makes it pretty. ensure_ascii=False keeps emojis/foreign chars readable.
+            json.dump(results, f, indent=4, ensure_ascii=False)
+        logging.info(f"Successfully saved {len(results)} records to {filename}")
+    except IOError as e:
+        logging.error(f"Failed to write to file {filename}: {type(e).__name__}: {e}")
+        raise
+    
 if __name__ == "__main__":
     # Example usage TODO: make a proper entry point later
     KEYWORD = "News"
@@ -108,8 +126,7 @@ if __name__ == "__main__":
     
     data = get_recent_transcripts(KEYWORD, limit=1)
 
-    print("\n--- Summary ---")
-    for item in data:
-        print(f"Video: {item['title']}")
-        print(f"Snippet: {item['transcript'][:100]}...") # Print first 100 chars
-        print("-" * 30)
+    output_filename = "transcripts.json"
+
+    # 3. Save to Disk
+    save_results_to_json(data, output_filename)
