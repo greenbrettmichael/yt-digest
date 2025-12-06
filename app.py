@@ -116,7 +116,7 @@ def save_results_to_json(results: list, filename: str):
             json.dump(results, f, indent=4, ensure_ascii=False)
         logging.info(f"Successfully saved {len(results)} records to {filename}")
     except IOError as e:
-        logging.error(f"Failed to write to file {filename}: {e}")
+        logging.error(f"Failed to write to file {filename}: {type(e).__name__}: {e}")
 
 if __name__ == "__main__":
     # Example usage TODO: make a proper entry point later
