@@ -1,9 +1,9 @@
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, mock_open
 from types import SimpleNamespace
 from youtube_transcript_api import TranscriptsDisabled
 
-from app import get_transcript_api, get_recent_transcripts
+from app import get_transcript_api, get_recent_transcripts, save_results_to_json
 
 @pytest.fixture
 def mock_search_results():
@@ -147,3 +147,43 @@ class TestTranscriptsEdgeCases:
         
         assert len(results) == 3
         assert results[-1]['video_id'] == 'v_2'
+
+class TestJsonOutput:
+    """Tests for the JSON file writing functionality."""
+
+    def test_save_results_to_json_success(self):
+        fake_data = [{'video_id': '123', 'title': 'Test', 'transcript': 'Content'}]
+        filename = "test_output.json"
+
+        # mock_open simulates opening a file handle
+        # json.dump is mocked so we don't actually try to write JSON logic
+        with patch("builtins.open", mock_open()) as mocked_file:
+            with patch("json.dump") as mocked_dump:
+                
+                save_results_to_json(fake_data, filename)
+
+                # 1. Verify file was opened with write permissions and utf-8
+                mocked_file.assert_called_once_with(filename, 'w', encoding='utf-8')
+
+                # 2. Verify json.dump was called with the correct data and formatting options
+                mocked_dump.assert_called_once_with(
+                    fake_data, 
+                    mocked_file(), # The file handle
+                    indent=4, 
+                    ensure_ascii=False
+                )
+
+    def test_save_results_io_error(self):
+        """Test that the function handles write errors gracefully (logs error)."""
+        fake_data = []
+        
+        # Simulate a permission denied error
+        with patch("builtins.open", mock_open()) as mocked_file:
+            mocked_file.side_effect = IOError("Permission denied")
+            
+            with patch("logging.error") as mock_log:
+                save_results_to_json(fake_data, "bad_file.json")
+                
+                # Check that we logged the error
+                mock_log.assert_called_once()
+                assert "Failed to write to file" in mock_log.call_args[0][0]
