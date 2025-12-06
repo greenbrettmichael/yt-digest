@@ -1,0 +1,11 @@
+name: yt_digest
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+    - scrapetube
+    - youtube-transcript-api
+    - python-dotenv
