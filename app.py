@@ -125,7 +125,7 @@ if __name__ == "__main__":
     
     data = get_recent_transcripts(KEYWORD, limit=1)
 
-    output_filename = f"transcripts.json"
+    output_filename = "transcripts.json"
 
     # 3. Save to Disk
     save_results_to_json(data, output_filename)
