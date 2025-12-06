@@ -9,3 +9,6 @@ dependencies:
     - scrapetube
     - youtube-transcript-api
     - python-dotenv
+    - pytest
+    - pytest-mock
+    - pytest-github-actions-annotate-failures

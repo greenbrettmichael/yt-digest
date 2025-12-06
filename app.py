@@ -29,13 +29,14 @@ def get_transcript_api():
     )
     return ytt_api
 
-def get_recent_transcripts(keyword: str, limit: int = 10):
+def get_recent_transcripts(keyword: str, limit: int = 10, api_client: YouTubeTranscriptApi = None):
     """
     Searches for the most recent videos by keyword and retrieves their transcripts.
 
     Args:
         keyword (str): The search keyword.
         limit (int): The maximum number of videos to process.
+        api_client (YouTubeTranscriptApi, optional): An instance of YouTubeTranscriptApi. If None, a new instance will be created.
     Returns:
         List of dictionaries containing video_id, title, and transcript for each video with available transcripts.
     """
@@ -50,7 +51,7 @@ def get_recent_transcripts(keyword: str, limit: int = 10):
 
     videos_processed = 0
     results_data = []
-    transcript_api = get_transcript_api()
+    transcript_api = api_client or get_transcript_api()
 
     for video in search_results:
         video_id = video.get('videoId')
