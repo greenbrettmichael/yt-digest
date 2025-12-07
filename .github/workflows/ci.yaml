@@ -57,7 +57,9 @@ jobs:
         run: pytest -v --junitxml=test-results.xml
 
       - name: Publish Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
+        uses: dorny/test-reporter@v1
         if: always()
         with:
-          files: test-results.xml
+          name: Pytest Results
+          path: test-results.xml
+          reporter: java-junit
