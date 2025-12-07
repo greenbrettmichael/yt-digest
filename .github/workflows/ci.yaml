@@ -35,7 +35,6 @@ jobs:
         with:
           activate-environment: yt_digest
           environment-file: environment.yaml
-          auto-activate: false
           use-only-tar-bz2: true
           conda-packages-dir: ~/conda_pkgs_dir
 
