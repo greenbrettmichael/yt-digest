@@ -27,7 +27,11 @@ jobs:
         with:
           activate-environment: yt_digest
           environment-file: environment.yaml
-          auto-activate-base: false
+          auto-activate: false
+
+      - name: Run Ruff linter
+        run: |
+          ruff check .
 
       - name: Run pytest
         run: |

@@ -13,3 +13,4 @@ dependencies:
     - pytest-mock
     - pytest-github-actions-annotate-failures
     - openai
+    - ruff

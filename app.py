@@ -1,12 +1,13 @@
 import json
-import os
-from typing import Dict, List
-import scrapetube
-from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
-from youtube_transcript_api.proxies import WebshareProxyConfig
 import logging
+import os
+
+import scrapetube
 from dotenv import load_dotenv
 from openai import OpenAI
+from youtube_transcript_api import NoTranscriptFound, TranscriptsDisabled, YouTubeTranscriptApi
+from youtube_transcript_api.proxies import WebshareProxyConfig
+
 
 def get_transcript_api() -> YouTubeTranscriptApi:
     """
@@ -32,7 +33,8 @@ def get_transcript_api() -> YouTubeTranscriptApi:
     )
     return ytt_api
 
-def get_recent_transcripts(keyword: str, limit: int = 10, api_client: YouTubeTranscriptApi = None) -> List[Dict]:
+
+def get_recent_transcripts(keyword: str, limit: int = 10, api_client: YouTubeTranscriptApi = None) -> list[dict]:
     """
     Searches for the most recent videos by keyword and retrieves their transcripts.
 
@@ -45,21 +47,16 @@ def get_recent_transcripts(keyword: str, limit: int = 10, api_client: YouTubeTra
     """
     logging.info(f"Searching for most recent videos for keyword: '{keyword}'...")
 
-    search_results = scrapetube.get_search(
-        query=keyword,
-        limit=limit,
-        sort_by="relevance",
-        results_type="video"
-    )
+    search_results = scrapetube.get_search(query=keyword, limit=limit, sort_by="relevance", results_type="video")
 
     videos_processed = 0
     results_data = []
     transcript_api = api_client or get_transcript_api()
 
     for video in search_results:
-        video_id = video.get('videoId')
+        video_id = video.get("videoId")
         try:
-            title = video['title']['runs'][0]['text']
+            title = video["title"]["runs"][0]["text"]
         except (KeyError, IndexError):
             title = "Unknown Title"
 
@@ -69,22 +66,26 @@ def get_recent_transcripts(keyword: str, limit: int = 10, api_client: YouTubeTra
         transcript_text = ""
         try:
             transcript_list_obj = transcript_api.list(video_id)
-            
+
             # Try to find English variants first
             try:
-                transcript_obj = transcript_list_obj.find_transcript(['en', 'en-US', 'en-GB'])
-                logging.info(f"Found English transcript for video ID: {video_id} with language code: {transcript_obj.language_code}")
+                transcript_obj = transcript_list_obj.find_transcript(["en", "en-US", "en-GB"])
+                logging.info(
+                    f"Found English transcript for video ID: {video_id} with language code: {transcript_obj.language_code}"
+                )
             except:
                 # Fallback: If no English, just take the first available one (e.g., Spanish, Auto-generated, etc.)
                 transcript_obj = next(iter(transcript_list_obj))
-                logging.info(f"No English transcript found. Using available transcript with language code: {transcript_obj.language_code} for video ID: {video_id}")
+                logging.info(
+                    f"No English transcript found. Using available transcript with language code: {transcript_obj.language_code} for video ID: {video_id}"
+                )
 
             # fetch() returns a list of dictionaries with 'text', 'start', and 'duration'
             fetched_transcript = transcript_obj.fetch()
-            
+
             # Combine the text parts into a single string, discarding timestamps for now
             transcript_text = " ".join([item.text for item in fetched_transcript])
-            
+
         except TranscriptsDisabled:
             logging.info(f"Transcripts are disabled for video ID: {video_id}")
             continue
@@ -95,38 +96,35 @@ def get_recent_transcripts(keyword: str, limit: int = 10, api_client: YouTubeTra
             logging.info(f"Error retrieving transcript for video ID: {video_id}: {str(e)}")
             continue
 
-        results_data.append({
-            'video_id': video_id,
-            'title': title,
-            'transcript': transcript_text
-        })
-        
+        results_data.append({"video_id": video_id, "title": title, "transcript": transcript_text})
 
     return results_data
 
-def save_results_to_json(results: List[Dict], filename: str):
+
+def save_results_to_json(results: list[dict], filename: str):
     """
     Saves the list of transcript dictionaries to a JSON file.
-    
+
     Args:
-        results (List[Dict]): The list of dictionaries from get_recent_transcripts.
+        results (list[dict]): The list of dictionaries from get_recent_transcripts.
         filename (str): The output filename.
     """
     try:
-        with open(filename, 'w', encoding='utf-8') as f:
+        with open(filename, "w", encoding="utf-8") as f:
             # indent=4 makes it pretty. ensure_ascii=False keeps emojis/foreign chars readable.
             json.dump(results, f, indent=4, ensure_ascii=False)
         logging.info(f"Successfully saved {len(results)} records to {filename}")
-    except IOError as e:
+    except OSError as e:
         logging.error(f"Failed to write to file {filename}: {type(e).__name__}: {e}")
         raise
 
-def generate_newsletter_digest(json_data: List[Dict], model: str = "gpt-5-mini-2025-08-07") -> str:
+
+def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2025-08-07") -> str:
     """
     Sends transcript data to OpenAI to generate a newsletter digest.
 
     Args:
-        json_data (List[Dict]): The list of video dictionaries.
+        json_data (list[dict]): The list of video dictionaries.
         model (str): The OpenAI model to use (default: "gpt-5-mini-2025-08-07").
 
     Returns:
@@ -162,16 +160,16 @@ def generate_newsletter_digest(json_data: List[Dict], model: str = "gpt-5-mini-2
     # Define the User Prompt
     user_prompt = f"""
     Here are the transcripts from the most recent videos.
-    
-    Please write a Newsletter Digest in Markdown format. 
-    
+
+    Please write a Newsletter Digest in Markdown format.
+
     **Strict Formatting Rules:**
     1. Do NOT include a main headline or title at the top.
     2. Do NOT include an Executive Summary or Intro.
     3. Start directly with the list of videos.
     4. Do NOT include a "TL;DR" line for the videos.
     5. Do NOT include any concluding remarks, "If you want...", or offers for further instructions at the end.
-    
+
     **Structure for each video:**
     ### Title: <Original Video Title>
     Link: https://www.youtube.com/watch?v=<Video ID>
@@ -179,33 +177,31 @@ def generate_newsletter_digest(json_data: List[Dict], model: str = "gpt-5-mini-2
     - <Bullet 1: Specific, actionable detail>
     - <Bullet 2: Specific, actionable detail>
     ... (Provide between 2 and 5 bullet points. Use fewer for short/simple videos, and more for dense/complex technical content.)
-    
+
     ---
-    
+
     Data:
     {context_block}
     """
 
     logging.info(f"Sending request to OpenAI ({model})...")
-    
+
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ]
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
         )
         return response.choices[0].message.content
     except Exception as e:
         logging.error(f"OpenAI API call failed: {e}")
-        raise RuntimeError(f"OpenAI API call failed")
+        raise RuntimeError("OpenAI API call failed")
+
 
 if __name__ == "__main__":
     # Example usage TODO: make a proper entry point later
     KEYWORD = "News"
     logging.basicConfig(level=logging.INFO)
-    
+
     data = get_recent_transcripts(KEYWORD, limit=10)
 
     output_filename = "transcripts.json"
@@ -214,8 +210,8 @@ if __name__ == "__main__":
     save_results_to_json(data, output_filename)
 
     newsletter = generate_newsletter_digest(data)
-        
+
     # Save Newsletter to Markdown file
-    md_filename = f"digest.md"
+    md_filename = "digest.md"
     with open(md_filename, "w", encoding="utf-8") as f:
         f.write(newsletter)
