@@ -281,6 +281,7 @@ def send_newsletter_resend(subject: str, body: str, recipients: list):
             "html": html_body      # HTML version with styling for modern email clients
         }
 
+        # Resend library lacks complete type annotations for SendParams
         email = resend.Emails.send(params)  # type: ignore[arg-type]
 
         # Resend returns an object (or dict) containing the ID
