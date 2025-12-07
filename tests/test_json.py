@@ -39,7 +39,7 @@ class TestJsonOutput:
             mocked_file.side_effect = OSError("Permission denied")
 
             # 1. Verify that the exception is re-raised
-            with pytest.raises(IOError):
+            with pytest.raises(OSError):
                 save_results_to_json(fake_data, filename)
 
             # 2. Verify the log message was captured by caplog
