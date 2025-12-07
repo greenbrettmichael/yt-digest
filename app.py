@@ -273,8 +273,8 @@ def send_newsletter_resend(subject: str, body: str, recipients: list):
             "from": from_email,
             "to": recipients,
             "subject": subject,
-            "text": body, # Fallback for old clients
-            "html": html_body      # The pretty version
+            "text": body, # Plain text fallback for email clients that don't support HTML
+            "html": html_body      # HTML version with styling for modern email clients
         }
 
         email = resend.Emails.send(params)
@@ -284,7 +284,7 @@ def send_newsletter_resend(subject: str, body: str, recipients: list):
             logging.info(f"Email sent successfully! ID: {email['id']}")
         else:
             logging.error(f"Resend did not return an ID. Response: {email}")
-
+            raise RuntimeError(f"Resend did not return an ID. Response: {email}")
     except Exception as e:
         logging.error(f"Failed to send email via Resend: {e}")
         raise RuntimeError(f"Resend Error: {e}")
