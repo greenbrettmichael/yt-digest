@@ -12,54 +12,54 @@ permissions:
   pull-requests: write
 
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Micromamba
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yaml
+          environment-name: yt_digest
+          cache-environment: true
+
+      - name: Run Ruff
+        run: ruff check .
+
+      - name: Run Flake8
+        run: flake8 .
+
+      - name: Run Mypy
+        run: mypy app.py tests/
+
   test:
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash -l {0}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Cache conda
-        uses: actions/cache@v4
-        env:
-          CACHE_NUMBER: 0
+      - name: Setup Micromamba
+        uses: mamba-org/setup-micromamba@v2
         with:
-          path: ~/conda_pkgs_dir
-          key: ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles('environment.yaml') }}
-
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('environment.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Set up Conda Environment
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          activate-environment: yt_digest
           environment-file: environment.yaml
-          auto-activate-base: false
-          use-only-tar-bz2: true
-
-      - name: Run Ruff linter
-        run: |
-          ruff check .
-
-      - name: Run mypy type checker
-        run: |
-          mypy app.py tests/
+          environment-name: yt_digest
+          cache-environment: true
 
       - name: Run pytest
-        run: |
-          pytest -v --junitxml=test-results.xml
+        run: pytest -v --junitxml=test-results.xml
 
       - name: Publish Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
+        uses: dorny/test-reporter@v1
         if: always()
         with:
-          files: test-results.xml
+          name: Pytest Results
+          path: test-results.xml
+          reporter: java-junit
