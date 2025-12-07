@@ -51,6 +51,7 @@ class TestEmailSending:
         )
 
         # Verify warning log message
+        assert "Skipping email" in caplog.text
         assert "No recipients provided" in caplog.text
 
     @patch("app.resend.Emails.send")
