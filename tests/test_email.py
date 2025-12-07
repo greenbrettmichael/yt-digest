@@ -78,7 +78,7 @@ class TestEmailSending:
 
     @patch("app.resend.Emails.send")
     def test_resend_response_without_id(self, mock_send, monkeypatch, caplog):
-        """Test that an error is logged when Resend returns a response without an 'id' field."""
+        """Test that an error is raised when Resend returns a response without an 'id' field."""
         caplog.set_level(logging.ERROR)
         monkeypatch.setenv("RESEND_API_KEY", "re_fake_key")
         monkeypatch.setenv("RESEND_FROM_EMAIL", "me@test.com")
@@ -86,11 +86,12 @@ class TestEmailSending:
         # Mock response without 'id' field
         mock_send.return_value = {"error": "some_error"}
 
-        send_newsletter_resend(
-            subject="Subject",
-            body="Body",
-            recipients=["recipient@test.com"]
-        )
+        with pytest.raises(RuntimeError, match="Resend did not return an ID"):
+            send_newsletter_resend(
+                subject="Subject",
+                body="Body",
+                recipients=["recipient@test.com"]
+            )
 
         # Verify the error was logged
         assert "Resend did not return an ID" in caplog.text
