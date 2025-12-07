@@ -106,7 +106,7 @@ def save_results_to_json(results: list[dict], filename: str):
     Saves the list of transcript dictionaries to a JSON file.
 
     Args:
-        results (List[Dict]): The list of dictionaries from get_recent_transcripts.
+        results (list[dict]): The list of dictionaries from get_recent_transcripts.
         filename (str): The output filename.
     """
     try:
@@ -124,7 +124,7 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
     Sends transcript data to OpenAI to generate a newsletter digest.
 
     Args:
-        json_data (List[Dict]): The list of video dictionaries.
+        json_data (list[dict]): The list of video dictionaries.
         model (str): The OpenAI model to use (default: "gpt-5-mini-2025-08-07").
 
     Returns:
