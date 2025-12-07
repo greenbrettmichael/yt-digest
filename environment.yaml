@@ -12,3 +12,4 @@ dependencies:
     - pytest
     - pytest-mock
     - pytest-github-actions-annotate-failures
+    - openai

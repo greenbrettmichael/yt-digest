@@ -1,12 +1,14 @@
 import json
 import os
+from typing import Dict, List
 import scrapetube
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 from youtube_transcript_api.proxies import WebshareProxyConfig
 import logging
 from dotenv import load_dotenv
+from openai import OpenAI
 
-def get_transcript_api():
+def get_transcript_api() -> YouTubeTranscriptApi:
     """
     Initializes and returns an instance of YouTubeTranscriptApi.
     If proxy credentials are found in environment variables, it configures the API to use the proxy.
@@ -30,7 +32,7 @@ def get_transcript_api():
     )
     return ytt_api
 
-def get_recent_transcripts(keyword: str, limit: int = 10, api_client: YouTubeTranscriptApi = None):
+def get_recent_transcripts(keyword: str, limit: int = 10, api_client: YouTubeTranscriptApi = None) -> List[Dict]:
     """
     Searches for the most recent videos by keyword and retrieves their transcripts.
 
@@ -102,12 +104,12 @@ def get_recent_transcripts(keyword: str, limit: int = 10, api_client: YouTubeTra
 
     return results_data
 
-def save_results_to_json(results: list, filename: str):
+def save_results_to_json(results: List[Dict], filename: str):
     """
     Saves the list of transcript dictionaries to a JSON file.
     
     Args:
-        results (list): The list of dictionaries from get_recent_transcripts.
+        results (List[Dict]): The list of dictionaries from get_recent_transcripts.
         filename (str): The output filename.
     """
     try:
@@ -118,15 +120,102 @@ def save_results_to_json(results: list, filename: str):
     except IOError as e:
         logging.error(f"Failed to write to file {filename}: {type(e).__name__}: {e}")
         raise
+
+def generate_newsletter_digest(json_data: List[Dict], model: str = "gpt-5-mini-2025-08-07") -> str:
+    """
+    Sends transcript data to OpenAI to generate a newsletter digest.
+
+    Args:
+        json_data (List[Dict]): The list of video dictionaries.
+        model (str): The OpenAI model to use (default: "gpt-5-mini-2025-08-07").
+
+    Returns:
+        str: The generated markdown newsletter.
+
+    Raises:
+        RuntimeError: If the OpenAI API call fails.
+        ValueError: If the OPENAI_API_KEY environment variable is not set.
+    """
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY not found in environment variables")
+
+    client = OpenAI(api_key=api_key)
+
+    # Pre-process the data
+    # We construct a string where we label every transcript clearly.
+    context_block = ""
+    for i, item in enumerate(json_data, 1):
+        # We include the ID so the LLM can generate YouTube links
+        context_block += f"--- VIDEO {i} ---\n"
+        context_block += f"Title: {item['title']}\n"
+        context_block += f"Video ID: {item['video_id']}\n"
+        # Truncate very long transcripts if necessary (e.g., to 20k chars) to fit context
+        context_block += f"Transcript: {item['transcript'][:25000]}\n\n"
+
+    # Define the System Prompt
+    system_prompt = (
+        "You are an expert tech newsletter editor. Your goal is to synthesize "
+        "raw video transcripts into a concise, high-value weekly digest."
+    )
+
+    # Define the User Prompt
+    user_prompt = f"""
+    Here are the transcripts from the most recent videos.
     
+    Please write a Newsletter Digest in Markdown format. 
+    
+    **Strict Formatting Rules:**
+    1. Do NOT include a main headline or title at the top.
+    2. Do NOT include an Executive Summary or Intro.
+    3. Start directly with the list of videos.
+    4. Do NOT include a "TL;DR" line for the videos.
+    5. Do NOT include any concluding remarks, "If you want...", or offers for further instructions at the end.
+    
+    **Structure for each video:**
+    ### Title: <Original Video Title>
+    Link: https://www.youtube.com/watch?v=<Video ID>
+    Key Takeaways:
+    - <Bullet 1: Specific, actionable detail>
+    - <Bullet 2: Specific, actionable detail>
+    ... (Provide between 2 and 5 bullet points. Use fewer for short/simple videos, and more for dense/complex technical content.)
+    
+    ---
+    
+    Data:
+    {context_block}
+    """
+
+    logging.info(f"Sending request to OpenAI ({model})...")
+    
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        logging.error(f"OpenAI API call failed: {e}")
+        raise RuntimeError(f"OpenAI API call failed")
+
 if __name__ == "__main__":
     # Example usage TODO: make a proper entry point later
     KEYWORD = "News"
     logging.basicConfig(level=logging.INFO)
     
-    data = get_recent_transcripts(KEYWORD, limit=1)
+    data = get_recent_transcripts(KEYWORD, limit=10)
 
     output_filename = "transcripts.json"
 
     # 3. Save to Disk
     save_results_to_json(data, output_filename)
+
+    newsletter = generate_newsletter_digest(data)
+        
+    # Save Newsletter to Markdown file
+    md_filename = f"digest.md"
+    with open(md_filename, "w", encoding="utf-8") as f:
+        f.write(newsletter)
