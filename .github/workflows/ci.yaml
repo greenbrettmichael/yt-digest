@@ -71,8 +71,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build Docker Image
-        run: docker build -t yt-digest:test .
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Load Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: yt-digest:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Smoke Test (Import Check)
         run: docker run --rm yt-digest:test python -c "import app; print('✅ App imports successfully')"
