@@ -18,3 +18,4 @@ dependencies:
     - markdown==3.10
     - mypy==1.13.0
     - types-Markdown==3.10.0.20251106
+    - flake8==7.1.1

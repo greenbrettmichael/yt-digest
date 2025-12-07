@@ -204,6 +204,7 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
         logging.error(f"OpenAI API call failed: {e}")
         raise RuntimeError("OpenAI API call failed")
 
+
 def markdown_to_email_html(md_content: str) -> str:
     """
     Converts Markdown to HTML with basic email styling.
@@ -243,6 +244,7 @@ def markdown_to_email_html(md_content: str) -> str:
         </html>
     """).strip()
 
+
 def send_newsletter_resend(subject: str, body: str, recipients: list):
     """
     Sends the newsletter using the Resend API.
@@ -277,8 +279,8 @@ def send_newsletter_resend(subject: str, body: str, recipients: list):
             "from": from_email,
             "to": recipients,
             "subject": subject,
-            "text": body, # Plain text fallback for email clients that don't support HTML
-            "html": html_body      # HTML version with styling for modern email clients
+            "text": body,  # Plain text fallback for email clients that don't support HTML
+            "html": html_body  # HTML version with styling for modern email clients
         }
 
         # Resend library lacks complete type annotations for SendParams
@@ -293,6 +295,7 @@ def send_newsletter_resend(subject: str, body: str, recipients: list):
     except Exception as e:
         logging.error(f"Failed to send email via Resend: {e}")
         raise RuntimeError(f"Resend Error: {e}")
+
 
 if __name__ == "__main__":
     # Example usage TODO: make a proper entry point later

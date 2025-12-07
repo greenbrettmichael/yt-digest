@@ -181,7 +181,7 @@ python -c "from app import get_recent_transcripts; help(get_recent_transcripts)"
 
 ### Code Quality
 
-This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and code formatting, and [mypy](http://mypy-lang.org/) for static type checking.
+This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and code formatting, [Flake8](https://flake8.pycqa.org/) for additional style checking, and [mypy](http://mypy-lang.org/) for static type checking.
 
 #### Running Ruff
 
@@ -209,6 +209,21 @@ Ruff is configured via `pyproject.toml` in the project root. The configuration i
 - Line length limit: 120 characters
 - Python version target: 3.10
 - Enabled rule sets: pycodestyle, pyflakes, isort, pep8-naming, pyupgrade, flake8-bugbear, flake8-comprehensions, and flake8-simplify
+
+#### Running Flake8
+
+To check your code for style and formatting issues:
+
+```bash
+flake8 .
+```
+
+#### Flake8 Configuration
+
+Flake8 is configured via `.flake8` in the project root. The configuration includes:
+- Line length limit: 120 characters
+- Excludes: `.git`, `.pytest_cache`, `__pycache__`, and other build/environment directories
+- Some rules are ignored to align with the project's code style (E501, E722, W503)
 
 #### Running mypy
 

@@ -89,7 +89,7 @@ class TestEmailSending:
         assert "html" in call_args
         assert "<h1>Hello</h1>" in call_args["html"]
         assert "<li>Item 1</li>" in call_args["html"]
-        assert "font-family" in call_args["html"] # Checks if CSS was added
+        assert "font-family" in call_args["html"]  # Checks if CSS was added
 
     @patch("app.resend.Emails.send")
     def test_resend_response_without_id(self, mock_send, monkeypatch, caplog):
@@ -111,6 +111,7 @@ class TestEmailSending:
         # Verify the error was logged
         assert "Resend did not return an ID" in caplog.text
         assert "some_error" in caplog.text
+
 
 class TestMarkdownConversion:
     """Tests for the markdown_to_email_html helper function."""
