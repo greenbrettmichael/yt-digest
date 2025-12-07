@@ -150,7 +150,7 @@ def generate_newsletter_digest(json_data: List[Dict], model: str = "gpt-5-mini-2
         context_block += f"--- VIDEO {i} ---\n"
         context_block += f"Title: {item['title']}\n"
         context_block += f"Video ID: {item['video_id']}\n"
-        # Truncate very long transcripts if necessary (e.g., to 20k chars) to fit context
+        # Truncate very long transcripts if necessary (e.g., to 25k chars) to fit context
         context_block += f"Transcript: {item['transcript'][:25000]}\n\n"
 
     # Define the System Prompt
