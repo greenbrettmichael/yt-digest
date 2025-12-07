@@ -28,7 +28,7 @@ class TestJsonOutput:
 
     def test_save_results_io_error(self, caplog):
         """Test that the function logs the error AND re-raises the exception."""
-        fake_data = []
+        fake_data: list[dict] = []
         filename = "bad_file.json"
 
         # Ensure we capture ERROR logs

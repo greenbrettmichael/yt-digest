@@ -50,6 +50,10 @@ jobs:
         run: |
           ruff check .
 
+      - name: Run mypy type checker
+        run: |
+          mypy app.py tests/
+
       - name: Run pytest
         run: |
           pytest -v --junitxml=test-results.xml

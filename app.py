@@ -37,7 +37,7 @@ def get_transcript_api() -> YouTubeTranscriptApi:
     return ytt_api
 
 
-def get_recent_transcripts(keyword: str, limit: int = 10, api_client: YouTubeTranscriptApi = None) -> list[dict]:
+def get_recent_transcripts(keyword: str, limit: int = 10, api_client: YouTubeTranscriptApi | None = None) -> list[dict]:
     """
     Searches for the most recent videos by keyword and retrieves their transcripts.
 
@@ -196,7 +196,10 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
             model=model,
             messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
         )
-        return response.choices[0].message.content
+        content = response.choices[0].message.content
+        if content is None:
+            raise RuntimeError("OpenAI returned empty content")
+        return content
     except Exception as e:
         logging.error(f"OpenAI API call failed: {e}")
         raise RuntimeError("OpenAI API call failed")
@@ -278,7 +281,7 @@ def send_newsletter_resend(subject: str, body: str, recipients: list):
             "html": html_body      # HTML version with styling for modern email clients
         }
 
-        email = resend.Emails.send(params)
+        email = resend.Emails.send(params)  # type: ignore[arg-type]
 
         # Resend returns an object (or dict) containing the ID
         if email and 'id' in email:

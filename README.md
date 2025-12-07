@@ -181,7 +181,7 @@ python -c "from app import get_recent_transcripts; help(get_recent_transcripts)"
 
 ### Code Quality
 
-This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and code formatting.
+This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and code formatting, and [mypy](http://mypy-lang.org/) for static type checking.
 
 #### Running Ruff
 
@@ -209,6 +209,22 @@ Ruff is configured via `pyproject.toml` in the project root. The configuration i
 - Line length limit: 120 characters
 - Python version target: 3.10
 - Enabled rule sets: pycodestyle, pyflakes, isort, pep8-naming, pyupgrade, flake8-bugbear, flake8-comprehensions, and flake8-simplify
+
+#### Running mypy
+
+To check your code for type errors:
+
+```bash
+mypy app.py tests/
+```
+
+#### mypy Configuration
+
+mypy is configured via `pyproject.toml` in the project root. The configuration includes:
+- Python version target: 3.10
+- Type checking for untyped code enabled
+- No implicit optional types allowed
+- Third-party libraries without type stubs (scrapetube, resend) are configured to ignore missing imports
 
 ### Testing
 
