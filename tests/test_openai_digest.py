@@ -30,7 +30,12 @@ class TestNewsletterGeneration:
         # The chain is: Client() -> chat.completions.create() -> response object
         mock_client = mock_openai_class.return_value
         mock_response = MagicMock()
-        mock_response.choices[0].message.content = "### Title: Test\nLink: ...\nKey Takeaways:\n- Point 1"
+        mock_response.choices[0].message.content = (
+            "### Title: Test\n"
+            "Link: [Watch on YouTube](https://...)\n"
+            "Key Takeaways:\n\n"
+            "- Point 1"
+        )
         mock_client.chat.completions.create.return_value = mock_response
 
         # 2. Input Data
@@ -63,6 +68,7 @@ class TestNewsletterGeneration:
         assert "Provide between 2 and 5 bullet points" in messages[1]["content"]
         # Check that our data was injected
         assert "Video ID: vid123" in messages[1]["content"]
+        assert "[Watch on YouTube]" in result
 
     @patch("app.OpenAI")
     def test_api_failure_raises_runtime_error(self, mock_openai_class, monkeypatch, caplog):
