@@ -12,7 +12,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  test:
+  ruff:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -50,13 +50,115 @@ jobs:
         run: |
           ruff check .
 
+  flake8:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache conda
+        uses: actions/cache@v4
+        env:
+          CACHE_NUMBER: 0
+        with:
+          path: ~/conda_pkgs_dir
+          key: ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles('environment.yaml') }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('environment.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Set up Conda Environment
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          activate-environment: yt_digest
+          environment-file: environment.yaml
+          auto-activate-base: false
+          use-only-tar-bz2: true
+
       - name: Run Flake8 linter
         run: |
           flake8 .
 
+  mypy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache conda
+        uses: actions/cache@v4
+        env:
+          CACHE_NUMBER: 0
+        with:
+          path: ~/conda_pkgs_dir
+          key: ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles('environment.yaml') }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('environment.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Set up Conda Environment
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          activate-environment: yt_digest
+          environment-file: environment.yaml
+          auto-activate-base: false
+          use-only-tar-bz2: true
+
       - name: Run mypy type checker
         run: |
           mypy app.py tests/
+
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache conda
+        uses: actions/cache@v4
+        env:
+          CACHE_NUMBER: 0
+        with:
+          path: ~/conda_pkgs_dir
+          key: ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles('environment.yaml') }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('environment.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Set up Conda Environment
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          activate-environment: yt_digest
+          environment-file: environment.yaml
+          auto-activate-base: false
+          use-only-tar-bz2: true
 
       - name: Run pytest
         run: |
