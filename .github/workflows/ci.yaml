@@ -29,6 +29,10 @@ jobs:
           environment-file: environment.yaml
           auto-activate-base: false
 
+      - name: Run Ruff linter
+        run: |
+          ruff check .
+
       - name: Run pytest
         run: |
           pytest -v --junitxml=test-results.xml
