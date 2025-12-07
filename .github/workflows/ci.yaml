@@ -35,7 +35,7 @@ jobs:
         with:
           activate-environment: yt_digest
           environment-file: environment.yaml
-          auto-activate: false
+          auto-activate-base: false
           use-only-tar-bz2: true
           pkgs-dirs: ~/conda_pkgs_dir
 
