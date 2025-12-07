@@ -16,3 +16,5 @@ dependencies:
     - ruff==0.14.8
     - resend==2.19.0
     - markdown==3.10
+    - mypy==1.13.0
+    - types-Markdown==3.10.0.20251106
