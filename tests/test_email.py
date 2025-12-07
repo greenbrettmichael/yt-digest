@@ -39,6 +39,21 @@ class TestEmailSending:
         send_newsletter_resend("Subj", "Body", ["r@test.com"])
         assert "Skipping email" in caplog.text
 
+    def test_empty_recipients(self, monkeypatch, caplog):
+        """Test that empty recipients list triggers a warning and returns early."""
+        caplog.set_level(logging.WARNING)
+        monkeypatch.setenv("RESEND_API_KEY", "re_fake_key")
+
+        send_newsletter_resend(
+            subject="Subject",
+            body="Body",
+            recipients=[]
+        )
+
+        # Verify warning log message
+        assert "Skipping email" in caplog.text
+        assert "No recipients provided" in caplog.text
+
     @patch("app.resend.Emails.send")
     def test_resend_failure(self, mock_send, monkeypatch, caplog):
         monkeypatch.setenv("RESEND_API_KEY", "re_fake_key")
