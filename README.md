@@ -123,7 +123,7 @@ python app.py
 - For each entry, it will:
   1. Fetch transcripts for up to 2 videos matching the search URL
   2. Generate an AI newsletter digest
-  5. Send the personalized newsletter to the recipient email
+  3. Send the personalized newsletter to the recipient email
 - If any entry fails, the application logs the error and continues with the next entry
 
 ### Core Functionality

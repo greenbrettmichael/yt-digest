@@ -176,7 +176,7 @@ class TestEmailListConfig:
         assert "Entry at index 0 missing or invalid 'search_url' field" in caplog.text
 
     def test_load_config_multiple_entries_partial_valid(self, tmp_path, caplog):
-        """Test that validation fails early when one entry is invalid."""
+        """Test that validation continues and filters out invalid entries."""
         config_file = tmp_path / "email_list.json"
         config_data = [
             {"email": "user1@example.com", "search_url": "https://youtube.com/1"},

@@ -379,9 +379,9 @@ if __name__ == "__main__":
     try:
         config_entries = load_email_list_config(config_file)
         logging.info(f"Using configuration from {config_file}")
-    except (FileNotFoundError, ValueError) as e:
-        logging.error(f"Could not load {config_file}: {e}")
-        exit(1)
+        if not config_entries:
+            logging.error(f"No valid configuration entries found in {config_file}")
+            exit(1)
 
     # Process each configuration entry
     for idx, entry in enumerate(config_entries):
@@ -389,7 +389,7 @@ if __name__ == "__main__":
         search_url = entry["search_url"]
 
         logging.info(f"\n{'=' * 60}")
-        logging.info(f"Processing entry {idx}/{len(config_entries)}")
+        logging.info(f"Processing entry {idx + 1}/{len(config_entries)}")
         logging.info(f"Recipient: {recipient_email}")
         logging.info(f"Search URL: {search_url}")
         logging.info(f"{'=' * 60}\n")
