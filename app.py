@@ -43,6 +43,64 @@ def get_transcript_api() -> YouTubeTranscriptApi:
     return ytt_api
 
 
+def load_email_list_config(config_path: str = "email_list.json") -> list[dict]:
+    """
+    Loads and validates the email list configuration from a JSON file.
+
+    Args:
+        config_path (str): Path to the email_list.json configuration file.
+
+    Returns:
+        list[dict]: A list of validated configuration entries, each containing:
+            - email (str): Recipient email address
+            - search_url (str): YouTube search URL
+
+    Raises:
+        FileNotFoundError: If the configuration file doesn't exist.
+        ValueError: If the JSON is malformed or entries are missing required fields.
+    """
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Configuration file not found: {config_path}")
+
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            config_data = json.load(f)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in configuration file: {e}")
+
+    if not isinstance(config_data, list):
+        raise ValueError("Configuration must be a JSON array of objects")
+
+    validated_entries = []
+    for idx, entry in enumerate(config_data):
+        if not isinstance(entry, dict):
+            raise ValueError(f"Entry at index {idx} must be an object")
+
+        email = entry.get("email")
+        search_url = entry.get("search_url")
+
+        if not email or not isinstance(email, str) or not email.strip():
+            logging.warning(f"Entry at index {idx} missing or invalid 'email' field")
+            continue
+
+        if not search_url or not isinstance(search_url, str) or not search_url.strip():
+            logging.warning(f"Entry at index {idx} missing or invalid 'search_url' field")
+            continue
+
+        # Basic email format validation
+        if "@" not in email:
+            logging.warning(f"Entry at index {idx} has invalid email format")
+            continue
+        validated_entries.append({"email": email.strip(), "search_url": search_url.strip()})
+
+    if len(validated_entries) == 0:
+        logging.warning("Configuration file contains no valid entries")
+        return []
+
+    logging.info(f"Successfully loaded {len(validated_entries)} configuration entries from {config_path}")
+    return validated_entries
+
+
 def get_recent_transcripts(url: str, limit: int = 10, api_client: YouTubeTranscriptApi | None = None) -> list[dict]:
     """
     Searches for the most recent videos by URL and retrieves their transcripts.
@@ -311,24 +369,51 @@ def send_newsletter_resend(subject: str, body: str, recipients: list):
 
 
 if __name__ == "__main__":
-    # Example usage TODO: make a proper entry point later
-    SEARCH_URL = "https://www.youtube.com/results?search_query=news&sp=EgIIAw%253D%253D"  # Most relevant news this week
     logging.basicConfig(level=logging.INFO)
+    load_dotenv()
 
-    data = get_recent_transcripts(SEARCH_URL, limit=2)
+    # Try to load configuration from email_list.json
+    config_file = "email_list.json"
+    config_entries = []
 
-    output_filename = "transcripts.json"
+    try:
+        config_entries = load_email_list_config(config_file)
+        logging.info(f"Using configuration from {config_file}")
+        if not config_entries:
+            logging.error(f"No valid configuration entries found in {config_file}")
+            exit(1)
+    except Exception as e:
+        logging.error(f"Failed to load configuration: {e}")
+        exit(1)
 
-    # 3. Save to Disk
-    save_results_to_json(data, output_filename)
+    # Process each configuration entry
+    for idx, entry in enumerate(config_entries):
+        recipient_email = entry["email"]
+        search_url = entry["search_url"]
 
-    newsletter = generate_newsletter_digest(data)
+        logging.info(f"\n{'=' * 60}")
+        logging.info(f"Processing entry {idx + 1}/{len(config_entries)}")
+        logging.info(f"Recipient: {recipient_email}")
+        logging.info(f"Search URL: {search_url}")
+        logging.info(f"{'=' * 60}\n")
 
-    # Save Newsletter to Markdown file
-    md_filename = "digest.md"
-    with open(md_filename, "w", encoding="utf-8") as f:
-        f.write(newsletter)
+        try:
+            # Fetch transcripts
+            data = get_recent_transcripts(search_url, limit=2)
 
-    recipient = os.getenv("RECIPIENT_EMAIL")
-    if recipient and os.getenv("RESEND_API_KEY"):
-        send_newsletter_resend(subject="YT DIGEST", body=newsletter, recipients=[recipient])
+            if not data:
+                logging.warning(f"No transcripts found for {recipient_email}, skipping...")
+                continue
+
+            # Generate newsletter digest
+            newsletter = generate_newsletter_digest(data)
+
+            # Send email
+            send_newsletter_resend(subject="YT DIGEST", body=newsletter, recipients=[recipient_email])
+
+            logging.info(f"Successfully processed entry for {recipient_email}\n")
+
+        except Exception as e:
+            logging.error(f"Error processing entry for {recipient_email}: {e}")
+            logging.info("Continuing with next entry...\n")
+            continue

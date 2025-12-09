@@ -13,7 +13,7 @@ Before setting up the project, ensure you have the following installed:
 - **API Keys**: You'll need API keys for the following services:
   - [OpenAI API Key](https://platform.openai.com/api-keys) - For generating newsletter digests
   - [Webshare Proxy](https://www.webshare.io/) credentials - For accessing YouTube transcripts (username and password)
-  - [Resend API Key](https://resend.com/api-keys) - For sending email newsletters (optional)
+  - [Resend API Key](https://resend.com/api-keys) - For sending email newsletters
 
 ### Installation
 
@@ -52,13 +52,10 @@ Before setting up the project, ensure you have the following installed:
    # OpenAI API Key
    OPENAI_API_KEY=sk-your-openai-api-key
    
-   # Resend Configuration (optional, for email newsletters)
+   # Resend Configuration
    RESEND_API_KEY=re_your-resend-api-key
    # Use 'onboarding@resend.dev' to test without a custom domain
    RESEND_FROM_EMAIL=onboarding@resend.dev
-   
-   # Newsletter Recipient
-   RECIPIENT_EMAIL=your-email@example.com
    ```
 
 ### Troubleshooting
@@ -82,6 +79,38 @@ Before setting up the project, ensure you have the following installed:
 
 ## Basic Usage
 
+### Configuration Using email_list.json
+
+Create an `email_list.json` file in the project root directory with the following structure:
+
+```json
+[
+    {
+        "email": "user1@example.com",
+        "search_url": "https://www.youtube.com/results?search_query=python+tutorials&sp=EgIIAw%253D%253D"
+    },
+    {
+        "email": "user2@example.com",
+        "search_url": "https://www.youtube.com/results?search_query=ai+news&sp=EgIIAw%253D%253D"
+    }
+]
+```
+
+**Configuration File Format:**
+- The file must be a JSON array of objects
+- Each object represents a recipient/search URL pairing
+- Required fields for each entry:
+  - `email`: Recipient email address (must contain '@')
+  - `search_url`: Full YouTube search URL (see below for how to construct)
+
+**How to Construct YouTube Search URLs:**
+1. Go to YouTube and perform your desired search
+2. Apply any filters (upload date, duration, etc.)
+3. Copy the complete URL from your browser's address bar
+4. The URL should include the `sp` parameter for filters, e.g., `sp=EgIIAw%253D%253D` for videos uploaded this week
+
+**Example:** An `email_list.json.example` file is provided in the repository for reference.
+
 ### Running the Main Script
 
 The project can be run directly using the main script:
@@ -90,12 +119,12 @@ The project can be run directly using the main script:
 python app.py
 ```
 
-By default, this will:
-1. Search for recent videos matching the keyword "News" (configurable in the script)
-2. Fetch transcripts for up to 2 videos
-3. Save raw transcripts to `transcripts.json`
-4. Generate an AI newsletter digest and save it to `digest.md`
-5. Send the newsletter via email (if email credentials are configured)
+- The application processes each entry in the configuration file
+- For each entry, it will:
+  1. Fetch transcripts for up to 2 videos matching the search URL
+  2. Generate an AI newsletter digest
+  3. Send the personalized newsletter to the recipient email
+- If any entry fails, the application logs the error and continues with the next entry
 
 ### Core Functionality
 
@@ -118,21 +147,14 @@ The `yt-digest` tool provides several key functions:
 
 ### Customizing the Script
 
-You can modify the behavior by editing `app.py`:
+**For advanced users:** You can modify the behavior by editing `app.py`:
 
 ```python
-# Change search keyword
-KEYWORD = "AI News"  # Default: "News"
+# Adjust number of videos to process per recipient (default: 2)
+data = get_recent_transcripts(search_url, limit=5)
 
-# Adjust number of videos to process
-data = get_recent_transcripts(KEYWORD, limit=5)  # Default: 2
-
-# Customize OpenAI model
+# Customize OpenAI model (default: "gpt-5-mini-2025-08-07")
 newsletter = generate_newsletter_digest(data, model="gpt-4-turbo-preview")
-
-# Change output filenames
-output_filename = "my_transcripts.json"
-md_filename = "my_digest.md"
 ```
 
 ### Example Usage Workflows
@@ -144,8 +166,9 @@ from app import get_recent_transcripts, save_results_to_json, generate_newslette
 
 logging.basicConfig(level=logging.INFO)
 
-# Search and extract transcripts
-data = get_recent_transcripts("Python tutorials", limit=3)
+# Search and extract transcripts using a full YouTube URL
+url = "https://www.youtube.com/results?search_query=Python+tutorials&sp=EgIIAw%253D%253D"
+data = get_recent_transcripts(url, limit=3)
 
 # Save raw data
 save_results_to_json(data, "python_transcripts.json")
