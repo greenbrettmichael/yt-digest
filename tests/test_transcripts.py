@@ -97,3 +97,58 @@ class TestTranscriptsEdgeCases:
 
         assert len(results) == 3
         assert results[-1]["video_id"] == "v_2"
+
+
+class TestYoutubeUrlSupport:
+    """Tests for YouTube URL support in get_recent_transcripts."""
+
+    @patch("app.scrapetube.get_search")
+    def test_get_transcripts_with_url(self, mock_scrapetube, mock_api_client, mock_search_results):
+        """Test that get_recent_transcripts works with a YouTube search URL."""
+        mock_scrapetube.return_value = mock_search_results
+
+        # Use a full YouTube URL instead of a keyword
+        url = "https://www.youtube.com/results?search_query=news"
+        results = get_recent_transcripts(url, limit=2, api_client=mock_api_client)
+
+        # Verify that scrapetube was called with the extracted search_query
+        mock_scrapetube.assert_called_once()
+        call_args = mock_scrapetube.call_args
+        assert call_args[1]["query"] == "news"
+
+        # Verify results
+        assert len(results) == 2
+        assert results[0]["video_id"] == "vid_1"
+
+    @patch("app.scrapetube.get_search")
+    def test_get_transcripts_with_url_and_sp(self, mock_scrapetube, mock_api_client, mock_search_results):
+        """Test that get_recent_transcripts extracts sp parameter from URL."""
+        mock_scrapetube.return_value = mock_search_results
+
+        # Use a URL with both search_query and sp parameters
+        url = "https://www.youtube.com/results?search_query=news&sp=CAASBAgCEAE%3D"
+        results = get_recent_transcripts(url, limit=2, api_client=mock_api_client)
+
+        # Verify that scrapetube was called with the extracted search_query
+        mock_scrapetube.assert_called_once()
+        call_args = mock_scrapetube.call_args
+        assert call_args[1]["query"] == "news"
+
+        # Verify results
+        assert len(results) == 2
+
+    @patch("app.scrapetube.get_search")
+    def test_backward_compatibility_with_plain_keyword(self, mock_scrapetube, mock_api_client, mock_search_results):
+        """Test that plain keywords still work (backward compatibility)."""
+        mock_scrapetube.return_value = mock_search_results
+
+        # Use a plain keyword as before
+        results = get_recent_transcripts("test keyword", limit=2, api_client=mock_api_client)
+
+        # Verify that scrapetube was called with the keyword
+        mock_scrapetube.assert_called_once()
+        call_args = mock_scrapetube.call_args
+        assert call_args[1]["query"] == "test keyword"
+
+        # Verify results
+        assert len(results) == 2

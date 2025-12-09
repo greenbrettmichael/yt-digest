@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import textwrap
+from urllib.parse import parse_qs, urlparse
 
 import markdown
 import resend
@@ -10,6 +11,65 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from youtube_transcript_api import NoTranscriptFound, TranscriptsDisabled, YouTubeTranscriptApi
 from youtube_transcript_api.proxies import WebshareProxyConfig
+
+
+def parse_youtube_search_input(search_input: str) -> tuple[str, str | None]:
+    """
+    Parse a YouTube search input and extract the search query and optional sp parameter.
+
+    This function accepts either:
+    1. A plain keyword/search term (e.g., "python tutorials")
+    2. A full YouTube search URL (e.g., "https://www.youtube.com/results?search_query=news&sp=...")
+
+    When a URL is provided, it extracts:
+    - search_query: The search term from the URL query parameter
+    - sp: The advanced search filter parameter (if present)
+
+    Note: While the sp parameter is extracted, the current version of scrapetube
+    does not support passing custom sp parameters. The sp parameter is extracted
+    for future compatibility and logging purposes.
+
+    Args:
+        search_input (str): Either a plain keyword or a full YouTube search URL
+
+    Returns:
+        tuple[str, str | None]: A tuple containing (search_query, sp_param)
+            - search_query: The extracted search term or the original input if not a URL
+            - sp_param: The sp filter parameter if present in URL, None otherwise
+
+    Examples:
+        >>> parse_youtube_search_input("news")
+        ('news', None)
+
+        >>> parse_youtube_search_input("https://www.youtube.com/results?search_query=news")
+        ('news', None)
+
+        >>> parse_youtube_search_input("https://www.youtube.com/results?search_query=news&sp=CAASBAgCEAE%3D")
+        ('news', 'CAASBAgCEAE=')
+    """
+    # Check if the input looks like a URL (contains :// or starts with www.)
+    if "://" in search_input or search_input.startswith("www."):
+        try:
+            # Parse the URL to extract query parameters
+            parsed_url = urlparse(search_input)
+            query_params = parse_qs(parsed_url.query)
+
+            # Extract search_query parameter (returns a list, take first element)
+            search_query = query_params.get("search_query", [search_input])[0]
+
+            # Extract sp parameter if present (returns a list, take first element)
+            sp_param = query_params.get("sp", [None])[0]
+
+            logging.info(f"Parsed URL - search_query: '{search_query}', sp: '{sp_param}'")
+            return search_query, sp_param
+
+        except Exception as e:
+            # If URL parsing fails, treat it as a plain keyword
+            logging.warning(f"Failed to parse URL '{search_input}': {e}. Treating as plain keyword.")
+            return search_input, None
+    else:
+        # Input is a plain keyword, not a URL
+        return search_input, None
 
 
 def get_transcript_api() -> YouTubeTranscriptApi:
@@ -39,18 +99,27 @@ def get_transcript_api() -> YouTubeTranscriptApi:
 
 def get_recent_transcripts(keyword: str, limit: int = 10, api_client: YouTubeTranscriptApi | None = None) -> list[dict]:
     """
-    Searches for the most recent videos by keyword and retrieves their transcripts.
+    Searches for the most recent videos by keyword or URL and retrieves their transcripts.
+
+    This function accepts either a plain search keyword or a full YouTube search URL.
+    When a URL is provided, it extracts the search_query and sp parameters automatically.
 
     Args:
-        keyword (str): The search keyword.
+        keyword (str): Either a search keyword (e.g., "news") or a full YouTube search URL
+                      (e.g., "https://www.youtube.com/results?search_query=news&sp=...")
         limit (int): The maximum number of videos to process.
         api_client (YouTubeTranscriptApi, optional): An instance of YouTubeTranscriptApi. If None, a new instance will be created.
     Returns:
         List of dictionaries containing video_id, title, and transcript for each video with available transcripts.
     """
-    logging.info(f"Searching for most recent videos for keyword: '{keyword}'...")
+    # Parse the input to extract search query and sp parameter
+    search_query, sp_param = parse_youtube_search_input(keyword)
 
-    search_results = scrapetube.get_search(query=keyword, limit=limit, sort_by="relevance", results_type="video")
+    logging.info(f"Searching for most recent videos for keyword: '{search_query}'...")
+    if sp_param:
+        logging.info(f"Note: sp parameter '{sp_param}' was extracted but is not currently supported by scrapetube.")
+
+    search_results = scrapetube.get_search(query=search_query, limit=limit, sort_by="relevance", results_type="video")
 
     videos_processed = 0
     results_data = []
@@ -214,7 +283,7 @@ def markdown_to_email_html(md_content: str) -> str:
     Returns:
         str: The HTML content suitable for email bodies.
     """
-    html_content = markdown.markdown(md_content, extensions=['nl2br'])
+    html_content = markdown.markdown(md_content, extensions=["nl2br"])
 
     return textwrap.dedent(f"""
         <!DOCTYPE html>
@@ -280,14 +349,14 @@ def send_newsletter_resend(subject: str, body: str, recipients: list):
             "to": recipients,
             "subject": subject,
             "text": body,  # Plain text fallback for email clients that don't support HTML
-            "html": html_body  # HTML version with styling for modern email clients
+            "html": html_body,  # HTML version with styling for modern email clients
         }
 
         # Resend library lacks complete type annotations for SendParams
         email = resend.Emails.send(params)  # type: ignore[arg-type]
 
         # Resend returns an object (or dict) containing the ID
-        if email and 'id' in email:
+        if email and "id" in email:
             logging.info(f"Email sent successfully! ID: {email['id']}")
         else:
             logging.error(f"Resend did not return an ID. Response: {email}")
@@ -318,8 +387,4 @@ if __name__ == "__main__":
 
     recipient = os.getenv("RECIPIENT_EMAIL")
     if recipient and os.getenv("RESEND_API_KEY"):
-        send_newsletter_resend(
-            subject="YT DIGEST",
-            body=newsletter,
-            recipients=[recipient]
-        )
+        send_newsletter_resend(subject="YT DIGEST", body=newsletter, recipients=[recipient])
