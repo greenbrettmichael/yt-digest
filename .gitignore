@@ -1,2 +1,5 @@
 .env
 __pycache__/
+email_list.json
+transcripts*.json
+digest*.md

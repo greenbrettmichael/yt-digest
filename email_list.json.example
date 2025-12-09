@@ -1,0 +1,10 @@
+[
+    {
+        "email": "user1@example.com",
+        "search_url": "https://www.youtube.com/results?search_query=python+tutorials&sp=EgIIAw%253D%253D"
+    },
+    {
+        "email": "user2@example.com",
+        "search_url": "https://www.youtube.com/results?search_query=ai+news&sp=EgIIAw%253D%253D"
+    }
+]
