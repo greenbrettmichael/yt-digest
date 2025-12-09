@@ -11,6 +11,12 @@ from openai import OpenAI
 from youtube_transcript_api import NoTranscriptFound, TranscriptsDisabled, YouTubeTranscriptApi
 from youtube_transcript_api.proxies import WebshareProxyConfig
 
+# YouTube API constants for scrapetube's get_videos function
+YOUTUBE_SEARCH_API_ENDPOINT = "https://www.youtube.com/youtubei/v1/search"
+YOUTUBE_SEARCH_SELECTOR_LIST = "contents"
+YOUTUBE_SEARCH_SELECTOR_ITEM = "videoRenderer"
+YOUTUBE_SEARCH_SLEEP_SECONDS = 1
+
 
 def get_transcript_api() -> YouTubeTranscriptApi:
     """
@@ -49,15 +55,14 @@ def get_recent_transcripts(url: str, limit: int = 10, api_client: YouTubeTranscr
         List of dictionaries containing video_id, title, and transcript for each video with available transcripts.
     """
 
-    # Use the URL directly with scrapetube's get_videos function
     logging.info(f"Using YouTube search URL: {url}")
     search_results = scrapetube.scrapetube.get_videos(
         url=url,
-        api_endpoint="https://www.youtube.com/youtubei/v1/search",
-        selector_list="contents",
-        selector_item="videoRenderer",
+        api_endpoint=YOUTUBE_SEARCH_API_ENDPOINT,
+        selector_list=YOUTUBE_SEARCH_SELECTOR_LIST,
+        selector_item=YOUTUBE_SEARCH_SELECTOR_ITEM,
         limit=limit,
-        sleep=1,
+        sleep=YOUTUBE_SEARCH_SLEEP_SECONDS,
     )
 
     videos_processed = 0
