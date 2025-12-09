@@ -1,0 +1,17 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.env.example
+.git
+.gitignore
+.github
+.pytest_cache
+test-results.xml
+repomix-output.xml
+docker-compose.yml
+Dockerfile
