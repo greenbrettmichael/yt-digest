@@ -80,22 +80,24 @@ def load_email_list_config(config_path: str = "email_list.json") -> list[dict]:
         search_url = entry.get("search_url")
 
         if not email or not isinstance(email, str) or not email.strip():
-            raise ValueError(f"Entry at index {idx} missing or invalid 'email' field")
+            logging.warning(f"Entry at index {idx} missing or invalid 'email' field")
+            continue
 
         if not search_url or not isinstance(search_url, str) or not search_url.strip():
-            raise ValueError(f"Entry at index {idx} missing or invalid 'search_url' field")
+            logging.warning(f"Entry at index {idx} missing or invalid 'search_url' field")
+            continue
 
         # Basic email format validation
         if "@" not in email:
-            raise ValueError(f"Entry at index {idx} has invalid email format")
-
+            logging.warning(f"Entry at index {idx} has invalid email format")
+            continue
         validated_entries.append({"email": email.strip(), "search_url": search_url.strip()})
 
-    if not validated_entries:
-        raise ValueError("Configuration file contains no valid entries")
+    if len(validated_entries) == 0:
+        logging.warning("Configuration file contains no valid entries")
+        return []
 
-    entry_word = "entry" if len(validated_entries) == 1 else "entries"
-    logging.info(f"Successfully loaded {len(validated_entries)} configuration {entry_word} from {config_path}")
+    logging.info(f"Successfully loaded {len(validated_entries)} configuration entries from {config_path}")
     return validated_entries
 
 
@@ -378,23 +380,11 @@ if __name__ == "__main__":
         config_entries = load_email_list_config(config_file)
         logging.info(f"Using configuration from {config_file}")
     except (FileNotFoundError, ValueError) as e:
-        logging.warning(f"Could not load {config_file}: {e}")
-        logging.info("Falling back to environment variable configuration")
-
-        # Fallback to old behavior using environment variables
-        recipient = os.getenv("RECIPIENT_EMAIL")
-        search_url = os.getenv(
-            "YOUTUBE_SEARCH_URL", "https://www.youtube.com/results?search_query=news&sp=EgIIAw%253D%253D"
-        )
-
-        if recipient:
-            config_entries = [{"email": recipient, "search_url": search_url}]
-        else:
-            logging.error("No configuration found. Please create email_list.json or set RECIPIENT_EMAIL env var")
-            exit(1)
+        logging.error(f"Could not load {config_file}: {e}")
+        exit(1)
 
     # Process each configuration entry
-    for idx, entry in enumerate(config_entries, 1):
+    for idx, entry in enumerate(config_entries):
         recipient_email = entry["email"]
         search_url = entry["search_url"]
 
@@ -412,24 +402,11 @@ if __name__ == "__main__":
                 logging.warning(f"No transcripts found for {recipient_email}, skipping...")
                 continue
 
-            # Save transcripts to JSON (with unique filename per recipient)
-            safe_email = recipient_email.replace("@", "_at_").replace(".", "_")
-            output_filename = f"transcripts_{safe_email}.json"
-            save_results_to_json(data, output_filename)
-
             # Generate newsletter digest
             newsletter = generate_newsletter_digest(data)
 
-            # Save newsletter to Markdown file (with unique filename per recipient)
-            md_filename = f"digest_{safe_email}.md"
-            with open(md_filename, "w", encoding="utf-8") as f:
-                f.write(newsletter)
-
             # Send email
-            if os.getenv("RESEND_API_KEY"):
-                send_newsletter_resend(subject="YT DIGEST", body=newsletter, recipients=[recipient_email])
-            else:
-                logging.warning("RESEND_API_KEY not set, skipping email send")
+            send_newsletter_resend(subject="YT DIGEST", body=newsletter, recipients=[recipient_email])
 
             logging.info(f"Successfully processed entry for {recipient_email}\n")
 

@@ -13,7 +13,7 @@ Before setting up the project, ensure you have the following installed:
 - **API Keys**: You'll need API keys for the following services:
   - [OpenAI API Key](https://platform.openai.com/api-keys) - For generating newsletter digests
   - [Webshare Proxy](https://www.webshare.io/) credentials - For accessing YouTube transcripts (username and password)
-  - [Resend API Key](https://resend.com/api-keys) - For sending email newsletters (optional)
+  - [Resend API Key](https://resend.com/api-keys) - For sending email newsletters
 
 ### Installation
 
@@ -52,13 +52,10 @@ Before setting up the project, ensure you have the following installed:
    # OpenAI API Key
    OPENAI_API_KEY=sk-your-openai-api-key
    
-   # Resend Configuration (optional, for email newsletters)
+   # Resend Configuration
    RESEND_API_KEY=re_your-resend-api-key
    # Use 'onboarding@resend.dev' to test without a custom domain
    RESEND_FROM_EMAIL=onboarding@resend.dev
-   
-   # Newsletter Recipient
-   RECIPIENT_EMAIL=your-email@example.com
    ```
 
 ### Troubleshooting
@@ -82,11 +79,7 @@ Before setting up the project, ensure you have the following installed:
 
 ## Basic Usage
 
-### Configuration Options
-
-The application supports two configuration methods:
-
-#### Option 1: Using email_list.json (Recommended for Multiple Recipients)
+### Configuration Using email_list.json
 
 Create an `email_list.json` file in the project root directory with the following structure:
 
@@ -118,18 +111,6 @@ Create an `email_list.json` file in the project root directory with the followin
 
 **Example:** An `email_list.json.example` file is provided in the repository for reference.
 
-#### Option 2: Using Environment Variables (Single Recipient)
-
-If no `email_list.json` file is found, the application falls back to environment variables:
-
-```bash
-# In your .env file:
-RECIPIENT_EMAIL=your-email@example.com
-YOUTUBE_SEARCH_URL=https://www.youtube.com/results?search_query=news&sp=EgIIAw%253D%253D
-```
-
-If `YOUTUBE_SEARCH_URL` is not set, it defaults to searching for "news" videos from the past week.
-
 ### Running the Main Script
 
 The project can be run directly using the main script:
@@ -138,19 +119,12 @@ The project can be run directly using the main script:
 python app.py
 ```
 
-**When using email_list.json:**
 - The application processes each entry in the configuration file
 - For each entry, it will:
   1. Fetch transcripts for up to 2 videos matching the search URL
   2. Generate an AI newsletter digest
-  3. Save transcripts to `transcripts_<email>.json`
-  4. Save digest to `digest_<email>.md`
   5. Send the personalized newsletter to the recipient email
 - If any entry fails, the application logs the error and continues with the next entry
-
-**When using environment variables:**
-- Works the same as the original single-recipient mode
-- Saves to `transcripts.json` and `digest.md`
 
 ### Core Functionality
 
