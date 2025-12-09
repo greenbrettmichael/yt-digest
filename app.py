@@ -382,6 +382,9 @@ if __name__ == "__main__":
         if not config_entries:
             logging.error(f"No valid configuration entries found in {config_file}")
             exit(1)
+    except Exception as e:
+        logging.error(f"Failed to load configuration: {e}")
+        exit(1)
 
     # Process each configuration entry
     for idx, entry in enumerate(config_entries):

@@ -187,7 +187,7 @@ class TestEmailListConfig:
 
         caplog.set_level(logging.WARNING)
         validated = load_email_list_config(str(config_file))
-        assert len(validated) == 2 
+        assert len(validated) == 2
         assert validated[0]["email"] == "user1@example.com"
         assert validated[1]["email"] == "user3@example.com"
         assert "Entry at index 1 has invalid email format" in caplog.text
