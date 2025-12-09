@@ -30,9 +30,9 @@ class TestNewsletterGeneration:
         # The chain is: Client() -> chat.completions.create() -> response object
         mock_client = mock_openai_class.return_value
         mock_response = MagicMock()
-        mock_response.choices[
-            0
-        ].message.content = "### Title: Test\nLink: [Watch on YouTube](https://...)\nKey Takeaways:\n\n- Point 1"
+        mock_response.choices[0].message.content = (
+            "### Title: Test\nLink: [Watch on YouTube](https://...)\nKey Takeaways:\n\n- Point 1"
+        )
         mock_client.chat.completions.create.return_value = mock_response
 
         # 2. Input Data

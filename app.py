@@ -17,8 +17,18 @@ def decode_sp_parameter(sp_param: str) -> str | None:
     """
     Decode the YouTube sp parameter to extract the sort_by filter.
 
-    The sp parameter follows the pattern: CA{sort_by_code}SAhA{results_type_code}
-    This function extracts the sort_by_code and maps it back to the sort_by value.
+    YouTube's sp parameter is a base64-encoded string that contains search filters.
+    The sort_by filter is encoded in a pattern where scrapetube uses:
+    CA{sort_by_code}SAhA{results_type_code}
+
+    This function extracts the third character (after "CA") which represents the sort_by code:
+    - "A" = relevance
+    - "I" = upload_date (newest first)
+    - "M" = view_count (most views)
+    - "E" = rating (highest rated)
+
+    Note: This is a simplified extraction that works for scrapetube-generated sp parameters.
+    More complex YouTube sp parameters may not be fully decoded by this function.
 
     Args:
         sp_param (str): The sp parameter from YouTube URL (e.g., "CAASBAgCEAE=")
@@ -43,8 +53,8 @@ def decode_sp_parameter(sp_param: str) -> str | None:
     }
 
     try:
-        # The sp parameter pattern is: CA{sort_by_code}SAhA{results_type_code}
-        # Extract the character after "CA" which is the sort_by code
+        # Extract the third character (index 2) after "CA" prefix
+        # This is where scrapetube encodes the sort_by code
         if sp_param.startswith("CA") and len(sp_param) > 2:
             sort_by_code = sp_param[2]
             sort_by = sort_by_reverse_map.get(sort_by_code)
@@ -55,7 +65,7 @@ def decode_sp_parameter(sp_param: str) -> str | None:
                 logging.warning(f"Unknown sort_by code '{sort_by_code}' in sp parameter")
                 return None
         else:
-            logging.warning(f"sp parameter '{sp_param}' does not follow expected pattern")
+            logging.warning(f"sp parameter '{sp_param}' does not start with 'CA' or is too short")
             return None
     except Exception as e:
         logging.warning(f"Failed to decode sp parameter '{sp_param}': {e}")
