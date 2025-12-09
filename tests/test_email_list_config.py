@@ -139,7 +139,7 @@ class TestEmailListConfig:
         caplog.set_level(logging.INFO)
         load_email_list_config(str(config_file))
 
-        assert f"Successfully loaded 1 configuration entries from {config_file}" in caplog.text
+        assert f"Successfully loaded 1 configuration entry from {config_file}" in caplog.text
 
     def test_load_config_non_string_email(self, tmp_path):
         """Test error handling when email is not a string."""

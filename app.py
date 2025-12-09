@@ -87,14 +87,15 @@ def load_email_list_config(config_path: str = "email_list.json") -> list[dict]:
 
         # Basic email format validation
         if "@" not in email:
-            raise ValueError(f"Entry at index {idx} has invalid email format: {email}")
+            raise ValueError(f"Entry at index {idx} has invalid email format")
 
         validated_entries.append({"email": email.strip(), "search_url": search_url.strip()})
 
     if not validated_entries:
         raise ValueError("Configuration file contains no valid entries")
 
-    logging.info(f"Successfully loaded {len(validated_entries)} configuration entries from {config_path}")
+    entry_word = "entry" if len(validated_entries) == 1 else "entries"
+    logging.info(f"Successfully loaded {len(validated_entries)} configuration {entry_word} from {config_path}")
     return validated_entries
 
 
