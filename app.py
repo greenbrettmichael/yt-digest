@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import textwrap
-from urllib.parse import parse_qs, urlparse
 
 import markdown
 import resend
@@ -11,129 +10,6 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from youtube_transcript_api import NoTranscriptFound, TranscriptsDisabled, YouTubeTranscriptApi
 from youtube_transcript_api.proxies import WebshareProxyConfig
-
-
-def decode_sp_parameter(sp_param: str) -> str | None:
-    """
-    Decode the YouTube sp parameter to extract the sort_by filter.
-
-    YouTube's sp parameter is a base64-encoded string that contains search filters.
-    The sort_by filter is encoded in a pattern where scrapetube uses:
-    CA{sort_by_code}SAhA{results_type_code}
-
-    This function extracts the third character (after "CA") which represents the sort_by code:
-    - "A" = relevance
-    - "I" = upload_date (newest first)
-    - "M" = view_count (most views)
-    - "E" = rating (highest rated)
-
-    Note: This is a simplified extraction that works for scrapetube-generated sp parameters.
-    More complex YouTube sp parameters may not be fully decoded by this function.
-
-    Args:
-        sp_param (str): The sp parameter from YouTube URL (e.g., "CAASBAgCEAE=")
-
-    Returns:
-        str | None: The decoded sort_by value ("relevance", "upload_date", "view_count", or "rating"),
-                    or None if decoding fails
-
-    Examples:
-        >>> decode_sp_parameter("CAASBAgCEAE=")
-        'relevance'
-
-        >>> decode_sp_parameter("CAISAhAB")
-        'upload_date'
-    """
-    # Mapping from scrapetube's sort_by codes to sort_by values
-    sort_by_reverse_map = {
-        "A": "relevance",
-        "I": "upload_date",
-        "M": "view_count",
-        "E": "rating",
-    }
-
-    try:
-        # Extract the third character (index 2) after "CA" prefix
-        # This is where scrapetube encodes the sort_by code
-        if sp_param.startswith("CA") and len(sp_param) > 2:
-            sort_by_code = sp_param[2]
-            sort_by = sort_by_reverse_map.get(sort_by_code)
-            if sort_by:
-                logging.info(f"Decoded sp parameter: sort_by='{sort_by}' from code '{sort_by_code}'")
-                return sort_by
-            else:
-                logging.warning(f"Unknown sort_by code '{sort_by_code}' in sp parameter")
-                return None
-        else:
-            logging.warning(f"sp parameter '{sp_param}' does not start with 'CA' or is too short")
-            return None
-    except Exception as e:
-        logging.warning(f"Failed to decode sp parameter '{sp_param}': {e}")
-        return None
-
-
-def parse_youtube_search_input(search_input: str) -> tuple[str, str | None]:
-    """
-    Parse a YouTube search input and extract the search query and optional sp parameter.
-
-    This function accepts either:
-    1. A plain keyword/search term (e.g., "python tutorials")
-    2. A full YouTube search URL (e.g., "https://www.youtube.com/results?search_query=news&sp=...")
-
-    When a URL is provided, it extracts:
-    - search_query: The search term from the URL query parameter
-    - sp: The advanced search filter parameter (if present)
-
-    The sp parameter is decoded to extract the sort_by filter, which is then passed to scrapetube.
-
-    Args:
-        search_input (str): Either a plain keyword or a full YouTube search URL
-
-    Returns:
-        tuple[str, str | None]: A tuple containing (search_query, sort_by)
-            - search_query: The extracted search term or the original input if not a URL
-            - sort_by: The decoded sort_by value from sp parameter, or None if not present/decodable
-
-    Examples:
-        >>> parse_youtube_search_input("news")
-        ('news', None)
-
-        >>> parse_youtube_search_input("https://www.youtube.com/results?search_query=news")
-        ('news', None)
-
-        >>> parse_youtube_search_input("https://www.youtube.com/results?search_query=news&sp=CAASBAgCEAE%3D")
-        ('news', 'relevance')
-    """
-    # Check if the input looks like a URL (contains :// or starts with www.)
-    if "://" in search_input or search_input.startswith("www."):
-        try:
-            # Parse the URL to extract query parameters
-            parsed_url = urlparse(search_input)
-            query_params = parse_qs(parsed_url.query)
-
-            # Extract search_query parameter (returns a list, take first element)
-            search_query = query_params.get("search_query", [search_input])[0]
-
-            # Extract sp parameter if present (returns a list, take first element)
-            sp_param = query_params.get("sp", [None])[0]
-
-            # Decode sp parameter to get sort_by value
-            sort_by = None
-            if sp_param:
-                sort_by = decode_sp_parameter(sp_param)
-                logging.info(f"Parsed URL - search_query: '{search_query}', sp: '{sp_param}', sort_by: '{sort_by}'")
-            else:
-                logging.info(f"Parsed URL - search_query: '{search_query}', no sp parameter")
-
-            return search_query, sort_by
-
-        except Exception as e:
-            # If URL parsing fails, treat it as a plain keyword
-            logging.warning(f"Failed to parse URL '{search_input}': {e}. Treating as plain keyword.")
-            return search_input, None
-    else:
-        # Input is a plain keyword, not a URL
-        return search_input, None
 
 
 def get_transcript_api() -> YouTubeTranscriptApi:
@@ -165,28 +41,39 @@ def get_recent_transcripts(keyword: str, limit: int = 10, api_client: YouTubeTra
     """
     Searches for the most recent videos by keyword or URL and retrieves their transcripts.
 
-    This function accepts either a plain search keyword or a full YouTube search URL.
-    When a URL is provided, it extracts the search_query and sp parameters automatically.
-    The sp parameter is decoded to determine the sort_by filter.
+    This function accepts either:
+    1. A plain search keyword (e.g., "news")
+    2. A full YouTube search URL with optional sp parameter for advanced filtering
+       (e.g., "https://www.youtube.com/results?search_query=news&sp=...")
+
+    When a URL is provided, it is passed directly to scrapetube, preserving all
+    search parameters including the sp parameter for sorting and filtering.
 
     Args:
-        keyword (str): Either a search keyword (e.g., "news") or a full YouTube search URL
-                      (e.g., "https://www.youtube.com/results?search_query=news&sp=...")
+        keyword (str): Either a search keyword or a full YouTube search URL
         limit (int): The maximum number of videos to process.
         api_client (YouTubeTranscriptApi, optional): An instance of YouTubeTranscriptApi. If None, a new instance will be created.
     Returns:
         List of dictionaries containing video_id, title, and transcript for each video with available transcripts.
     """
-    # Parse the input to extract search query and sort_by from sp parameter
-    search_query, sort_by = parse_youtube_search_input(keyword)
+    # Check if the input is a URL
+    is_url = "://" in keyword or keyword.startswith("www.")
 
-    # Default to "relevance" if no sort_by was extracted
-    if not sort_by:
-        sort_by = "relevance"
-
-    logging.info(f"Searching for most recent videos for keyword: '{search_query}' with sort_by: '{sort_by}'...")
-
-    search_results = scrapetube.get_search(query=search_query, limit=limit, sort_by=sort_by, results_type="video")
+    if is_url:
+        # Use the URL directly with scrapetube's get_videos function
+        logging.info(f"Using YouTube search URL: {keyword}")
+        search_results = scrapetube.scrapetube.get_videos(
+            url=keyword,
+            api_endpoint="https://www.youtube.com/youtubei/v1/search",
+            selector_list="contents",
+            selector_item="videoRenderer",
+            limit=limit,
+            sleep=1,
+        )
+    else:
+        # Use keyword search with default relevance sorting
+        logging.info(f"Searching for most recent videos for keyword: '{keyword}'...")
+        search_results = scrapetube.get_search(query=keyword, limit=limit, sort_by="relevance", results_type="video")
 
     videos_processed = 0
     results_data = []

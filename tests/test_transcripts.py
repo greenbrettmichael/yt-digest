@@ -102,57 +102,38 @@ class TestTranscriptsEdgeCases:
 class TestYoutubeUrlSupport:
     """Tests for YouTube URL support in get_recent_transcripts."""
 
-    @patch("app.scrapetube.get_search")
-    def test_get_transcripts_with_url(self, mock_scrapetube, mock_api_client, mock_search_results):
+    @patch("app.scrapetube.scrapetube.get_videos")
+    def test_get_transcripts_with_url(self, mock_get_videos, mock_api_client, mock_search_results):
         """Test that get_recent_transcripts works with a YouTube search URL."""
-        mock_scrapetube.return_value = mock_search_results
+        mock_get_videos.return_value = mock_search_results
 
         # Use a full YouTube URL instead of a keyword
         url = "https://www.youtube.com/results?search_query=news"
         results = get_recent_transcripts(url, limit=2, api_client=mock_api_client)
 
-        # Verify that scrapetube was called with the extracted search_query and default sort_by
-        mock_scrapetube.assert_called_once()
-        call_args = mock_scrapetube.call_args
-        assert call_args[1]["query"] == "news"
-        assert call_args[1]["sort_by"] == "relevance"
+        # Verify that get_videos was called with the URL
+        mock_get_videos.assert_called_once()
+        call_args = mock_get_videos.call_args
+        assert call_args[1]["url"] == url
+        assert call_args[1]["api_endpoint"] == "https://www.youtube.com/youtubei/v1/search"
 
         # Verify results
         assert len(results) == 2
         assert results[0]["video_id"] == "vid_1"
 
-    @patch("app.scrapetube.get_search")
-    def test_get_transcripts_with_url_and_sp(self, mock_scrapetube, mock_api_client, mock_search_results):
-        """Test that get_recent_transcripts decodes sp parameter and uses sort_by."""
-        mock_scrapetube.return_value = mock_search_results
+    @patch("app.scrapetube.scrapetube.get_videos")
+    def test_get_transcripts_with_url_and_sp(self, mock_get_videos, mock_api_client, mock_search_results):
+        """Test that get_recent_transcripts passes URL with sp parameter directly."""
+        mock_get_videos.return_value = mock_search_results
 
-        # Use a URL with both search_query and sp parameters (relevance)
+        # Use a URL with both search_query and sp parameters
         url = "https://www.youtube.com/results?search_query=news&sp=CAASBAgCEAE%3D"
         results = get_recent_transcripts(url, limit=2, api_client=mock_api_client)
 
-        # Verify that scrapetube was called with decoded sort_by
-        mock_scrapetube.assert_called_once()
-        call_args = mock_scrapetube.call_args
-        assert call_args[1]["query"] == "news"
-        assert call_args[1]["sort_by"] == "relevance"
-
-        # Verify results
-        assert len(results) == 2
-
-    @patch("app.scrapetube.get_search")
-    def test_get_transcripts_with_url_and_sp_upload_date(self, mock_scrapetube, mock_api_client, mock_search_results):
-        """Test that get_recent_transcripts properly decodes upload_date from sp."""
-        mock_scrapetube.return_value = mock_search_results
-
-        # Use a URL with sp parameter for upload_date (I)
-        url = "https://www.youtube.com/results?search_query=news&sp=CAISAhAB"
-        results = get_recent_transcripts(url, limit=2, api_client=mock_api_client)
-
-        # Verify that scrapetube was called with upload_date sort_by
-        mock_scrapetube.assert_called_once()
-        call_args = mock_scrapetube.call_args
-        assert call_args[1]["query"] == "news"
-        assert call_args[1]["sort_by"] == "upload_date"
+        # Verify that get_videos was called with the full URL (preserving sp parameter)
+        mock_get_videos.assert_called_once()
+        call_args = mock_get_videos.call_args
+        assert call_args[1]["url"] == url
 
         # Verify results
         assert len(results) == 2
@@ -165,7 +146,7 @@ class TestYoutubeUrlSupport:
         # Use a plain keyword as before
         results = get_recent_transcripts("test keyword", limit=2, api_client=mock_api_client)
 
-        # Verify that scrapetube was called with the keyword and default sort_by
+        # Verify that scrapetube.get_search was called with the keyword
         mock_scrapetube.assert_called_once()
         call_args = mock_scrapetube.call_args
         assert call_args[1]["query"] == "test keyword"
