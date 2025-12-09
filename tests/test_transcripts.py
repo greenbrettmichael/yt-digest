@@ -107,7 +107,7 @@ class TestYoutubeUrlSupport:
         """Test that get_recent_transcripts works with a YouTube search URL."""
         mock_get_videos.return_value = mock_search_results
 
-        # Use a full YouTube URL instead of a keyword
+        # Use a full YouTube URL
         url = "https://www.youtube.com/results?search_query=news"
         results = get_recent_transcripts(url, limit=2, api_client=mock_api_client)
 
@@ -134,23 +134,6 @@ class TestYoutubeUrlSupport:
         mock_get_videos.assert_called_once()
         call_args = mock_get_videos.call_args
         assert call_args[1]["url"] == url
-
-        # Verify results
-        assert len(results) == 2
-
-    @patch("app.scrapetube.get_search")
-    def test_backward_compatibility_with_plain_keyword(self, mock_scrapetube, mock_api_client, mock_search_results):
-        """Test that plain keywords still work (backward compatibility)."""
-        mock_scrapetube.return_value = mock_search_results
-
-        # Use a plain keyword as before
-        results = get_recent_transcripts("test keyword", limit=2, api_client=mock_api_client)
-
-        # Verify that scrapetube.get_search was called with the keyword
-        mock_scrapetube.assert_called_once()
-        call_args = mock_scrapetube.call_args
-        assert call_args[1]["query"] == "test keyword"
-        assert call_args[1]["sort_by"] == "relevance"
 
         # Verify results
         assert len(results) == 2

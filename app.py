@@ -37,43 +37,28 @@ def get_transcript_api() -> YouTubeTranscriptApi:
     return ytt_api
 
 
-def get_recent_transcripts(keyword: str, limit: int = 10, api_client: YouTubeTranscriptApi | None = None) -> list[dict]:
+def get_recent_transcripts(url: str, limit: int = 10, api_client: YouTubeTranscriptApi | None = None) -> list[dict]:
     """
-    Searches for the most recent videos by keyword or URL and retrieves their transcripts.
-
-    This function accepts either:
-    1. A plain search keyword (e.g., "news")
-    2. A full YouTube search URL with optional sp parameter for advanced filtering
-       (e.g., "https://www.youtube.com/results?search_query=news&sp=...")
-
-    When a URL is provided, it is passed directly to scrapetube, preserving all
-    search parameters including the sp parameter for sorting and filtering.
+    Searches for the most recent videos by URL and retrieves their transcripts.
 
     Args:
-        keyword (str): Either a search keyword or a full YouTube search URL
+        url (str):  A full YouTube search URL with optional sp parameter for advanced filtering
         limit (int): The maximum number of videos to process.
         api_client (YouTubeTranscriptApi, optional): An instance of YouTubeTranscriptApi. If None, a new instance will be created.
     Returns:
         List of dictionaries containing video_id, title, and transcript for each video with available transcripts.
     """
-    # Check if the input is a URL
-    is_url = "://" in keyword or keyword.startswith("www.")
 
-    if is_url:
-        # Use the URL directly with scrapetube's get_videos function
-        logging.info(f"Using YouTube search URL: {keyword}")
-        search_results = scrapetube.scrapetube.get_videos(
-            url=keyword,
-            api_endpoint="https://www.youtube.com/youtubei/v1/search",
-            selector_list="contents",
-            selector_item="videoRenderer",
-            limit=limit,
-            sleep=1,
-        )
-    else:
-        # Use keyword search with default relevance sorting
-        logging.info(f"Searching for most recent videos for keyword: '{keyword}'...")
-        search_results = scrapetube.get_search(query=keyword, limit=limit, sort_by="relevance", results_type="video")
+    # Use the URL directly with scrapetube's get_videos function
+    logging.info(f"Using YouTube search URL: {url}")
+    search_results = scrapetube.scrapetube.get_videos(
+        url=url,
+        api_endpoint="https://www.youtube.com/youtubei/v1/search",
+        selector_list="contents",
+        selector_item="videoRenderer",
+        limit=limit,
+        sleep=1,
+    )
 
     videos_processed = 0
     results_data = []
@@ -322,10 +307,10 @@ def send_newsletter_resend(subject: str, body: str, recipients: list):
 
 if __name__ == "__main__":
     # Example usage TODO: make a proper entry point later
-    KEYWORD = "News"
+    SEARCH_URL = "https://www.youtube.com/results?search_query=news&sp=EgIIAw%253D%253D"  # Most relevant news this week
     logging.basicConfig(level=logging.INFO)
 
-    data = get_recent_transcripts(KEYWORD, limit=2)
+    data = get_recent_transcripts(SEARCH_URL, limit=2)
 
     output_filename = "transcripts.json"
 
