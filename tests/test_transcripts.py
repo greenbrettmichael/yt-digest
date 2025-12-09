@@ -19,7 +19,7 @@ def mock_search_results():
 class TestTranscriptsHappyPath:
     """Tests for the standard successful execution paths."""
 
-    @patch("app.scrapetube.get_search")
+    @patch("app.scrapetube.scrapetube.get_videos")
     def test_search_and_fetch_english_success(self, mock_scrapetube, mock_api_client, mock_search_results):
         # Setup
         mock_scrapetube.return_value = mock_search_results
@@ -36,7 +36,7 @@ class TestTranscriptsHappyPath:
         mock_api_client.list.assert_any_call("vid_1")
         mock_api_client.list.return_value.find_transcript.assert_called_with(["en", "en-US", "en-GB"])
 
-    @patch("app.scrapetube.get_search")
+    @patch("app.scrapetube.scrapetube.get_videos")
     def test_search_fallback_language(self, mock_scrapetube, mock_api_client, mock_search_results):
         # Setup: Return 1 video
         mock_scrapetube.return_value = [mock_search_results[0]]
@@ -62,7 +62,7 @@ class TestTranscriptsHappyPath:
 class TestTranscriptsEdgeCases:
     """Tests for error handling, limits, and malformed data."""
 
-    @patch("app.scrapetube.get_search")
+    @patch("app.scrapetube.scrapetube.get_videos")
     def test_transcripts_disabled(self, mock_scrapetube, mock_api_client, mock_search_results):
         mock_scrapetube.return_value = mock_search_results
 
@@ -74,7 +74,7 @@ class TestTranscriptsEdgeCases:
         # Should return empty list (skipped)
         assert len(results) == 0
 
-    @patch("app.scrapetube.get_search")
+    @patch("app.scrapetube.scrapetube.get_videos")
     def test_bad_title_structure(self, mock_scrapetube, mock_api_client):
         # Simulate: Video object missing the standard title structure
         bad_video = {"videoId": "vid_bad", "title": {}}
@@ -85,15 +85,55 @@ class TestTranscriptsEdgeCases:
         assert len(results) == 1
         assert results[0]["title"] == "Unknown Title"
 
-    @patch("app.scrapetube.get_search")
+    @patch("app.scrapetube.scrapetube.get_videos")
     def test_limit_enforcement(self, mock_scrapetube, mock_api_client):
         # Simulate: Search returns 10 videos
         many_videos = [{"videoId": f"v_{i}", "title": {"runs": [{"text": f"T_{i}"}]}} for i in range(10)]
 
-        mock_scrapetube.side_effect = lambda query, limit, **kwargs: many_videos[:limit]
+        mock_scrapetube.side_effect = lambda url, api_endpoint, selector_list, selector_item, limit, sleep, **kwargs: many_videos[:limit]
 
         # Execute: Request limit of 3
         results = get_recent_transcripts("test", limit=3, api_client=mock_api_client)
 
         assert len(results) == 3
         assert results[-1]["video_id"] == "v_2"
+
+
+class TestYoutubeUrlSupport:
+    """Tests for YouTube URL support in get_recent_transcripts."""
+
+    @patch("app.scrapetube.scrapetube.get_videos")
+    def test_get_transcripts_with_url(self, mock_get_videos, mock_api_client, mock_search_results):
+        """Test that get_recent_transcripts works with a YouTube search URL."""
+        mock_get_videos.return_value = mock_search_results
+
+        # Use a full YouTube URL
+        url = "https://www.youtube.com/results?search_query=news"
+        results = get_recent_transcripts(url, limit=2, api_client=mock_api_client)
+
+        # Verify that get_videos was called with the URL
+        mock_get_videos.assert_called_once()
+        call_args = mock_get_videos.call_args
+        assert call_args[1]["url"] == url
+        assert call_args[1]["api_endpoint"] == "https://www.youtube.com/youtubei/v1/search"
+
+        # Verify results
+        assert len(results) == 2
+        assert results[0]["video_id"] == "vid_1"
+
+    @patch("app.scrapetube.scrapetube.get_videos")
+    def test_get_transcripts_with_url_and_sp(self, mock_get_videos, mock_api_client, mock_search_results):
+        """Test that get_recent_transcripts passes URL with sp parameter directly."""
+        mock_get_videos.return_value = mock_search_results
+
+        # Use a URL with both search_query and sp parameters
+        url = "https://www.youtube.com/results?search_query=news&sp=CAASBAgCEAE%3D"
+        results = get_recent_transcripts(url, limit=2, api_client=mock_api_client)
+
+        # Verify that get_videos was called with the full URL (preserving sp parameter)
+        mock_get_videos.assert_called_once()
+        call_args = mock_get_videos.call_args
+        assert call_args[1]["url"] == url
+
+        # Verify results
+        assert len(results) == 2

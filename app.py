@@ -11,6 +11,12 @@ from openai import OpenAI
 from youtube_transcript_api import NoTranscriptFound, TranscriptsDisabled, YouTubeTranscriptApi
 from youtube_transcript_api.proxies import WebshareProxyConfig
 
+# YouTube API constants for scrapetube's get_videos function
+YOUTUBE_SEARCH_API_ENDPOINT = "https://www.youtube.com/youtubei/v1/search"
+YOUTUBE_SEARCH_SELECTOR_LIST = "contents"
+YOUTUBE_SEARCH_SELECTOR_ITEM = "videoRenderer"
+YOUTUBE_SEARCH_SLEEP_SECONDS = 1
+
 
 def get_transcript_api() -> YouTubeTranscriptApi:
     """
@@ -37,20 +43,27 @@ def get_transcript_api() -> YouTubeTranscriptApi:
     return ytt_api
 
 
-def get_recent_transcripts(keyword: str, limit: int = 10, api_client: YouTubeTranscriptApi | None = None) -> list[dict]:
+def get_recent_transcripts(url: str, limit: int = 10, api_client: YouTubeTranscriptApi | None = None) -> list[dict]:
     """
-    Searches for the most recent videos by keyword and retrieves their transcripts.
+    Searches for the most recent videos by URL and retrieves their transcripts.
 
     Args:
-        keyword (str): The search keyword.
+        url (str):  A full YouTube search URL with optional sp parameter for advanced filtering
         limit (int): The maximum number of videos to process.
         api_client (YouTubeTranscriptApi, optional): An instance of YouTubeTranscriptApi. If None, a new instance will be created.
     Returns:
         List of dictionaries containing video_id, title, and transcript for each video with available transcripts.
     """
-    logging.info(f"Searching for most recent videos for keyword: '{keyword}'...")
 
-    search_results = scrapetube.get_search(query=keyword, limit=limit, sort_by="relevance", results_type="video")
+    logging.info(f"Using YouTube search URL: {url}")
+    search_results = scrapetube.scrapetube.get_videos(
+        url=url,
+        api_endpoint=YOUTUBE_SEARCH_API_ENDPOINT,
+        selector_list=YOUTUBE_SEARCH_SELECTOR_LIST,
+        selector_item=YOUTUBE_SEARCH_SELECTOR_ITEM,
+        limit=limit,
+        sleep=YOUTUBE_SEARCH_SLEEP_SECONDS,
+    )
 
     videos_processed = 0
     results_data = []
@@ -214,7 +227,7 @@ def markdown_to_email_html(md_content: str) -> str:
     Returns:
         str: The HTML content suitable for email bodies.
     """
-    html_content = markdown.markdown(md_content, extensions=['nl2br'])
+    html_content = markdown.markdown(md_content, extensions=["nl2br"])
 
     return textwrap.dedent(f"""
         <!DOCTYPE html>
@@ -280,14 +293,14 @@ def send_newsletter_resend(subject: str, body: str, recipients: list):
             "to": recipients,
             "subject": subject,
             "text": body,  # Plain text fallback for email clients that don't support HTML
-            "html": html_body  # HTML version with styling for modern email clients
+            "html": html_body,  # HTML version with styling for modern email clients
         }
 
         # Resend library lacks complete type annotations for SendParams
         email = resend.Emails.send(params)  # type: ignore[arg-type]
 
         # Resend returns an object (or dict) containing the ID
-        if email and 'id' in email:
+        if email and "id" in email:
             logging.info(f"Email sent successfully! ID: {email['id']}")
         else:
             logging.error(f"Resend did not return an ID. Response: {email}")
@@ -299,10 +312,10 @@ def send_newsletter_resend(subject: str, body: str, recipients: list):
 
 if __name__ == "__main__":
     # Example usage TODO: make a proper entry point later
-    KEYWORD = "News"
+    SEARCH_URL = "https://www.youtube.com/results?search_query=news&sp=EgIIAw%253D%253D"  # Most relevant news this week
     logging.basicConfig(level=logging.INFO)
 
-    data = get_recent_transcripts(KEYWORD, limit=2)
+    data = get_recent_transcripts(SEARCH_URL, limit=2)
 
     output_filename = "transcripts.json"
 
@@ -318,8 +331,4 @@ if __name__ == "__main__":
 
     recipient = os.getenv("RECIPIENT_EMAIL")
     if recipient and os.getenv("RESEND_API_KEY"):
-        send_newsletter_resend(
-            subject="YT DIGEST",
-            body=newsletter,
-            recipients=[recipient]
-        )
+        send_newsletter_resend(subject="YT DIGEST", body=newsletter, recipients=[recipient])

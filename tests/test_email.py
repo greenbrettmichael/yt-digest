@@ -7,7 +7,6 @@ from app import markdown_to_email_html, send_newsletter_resend
 
 
 class TestEmailSending:
-
     @patch("app.resend.Emails.send")
     def test_send_email_success(self, mock_send, monkeypatch, caplog):
         """Test happy path for Resend."""
@@ -18,11 +17,7 @@ class TestEmailSending:
         # Mock successful response
         mock_send.return_value = {"id": "email_12345"}
 
-        send_newsletter_resend(
-            subject="Subject",
-            body="Body",
-            recipients=["recipient@test.com"]
-        )
+        send_newsletter_resend(subject="Subject", body="Body", recipients=["recipient@test.com"])
 
         # Verify call arguments
         mock_send.assert_called_once()
@@ -44,11 +39,7 @@ class TestEmailSending:
         caplog.set_level(logging.WARNING)
         monkeypatch.setenv("RESEND_API_KEY", "re_fake_key")
 
-        send_newsletter_resend(
-            subject="Subject",
-            body="Body",
-            recipients=[]
-        )
+        send_newsletter_resend(subject="Subject", body="Body", recipients=[])
 
         # Verify warning log message
         assert "Skipping email" in caplog.text
@@ -74,11 +65,7 @@ class TestEmailSending:
 
         raw_markdown = "# Hello\n- Item 1"
 
-        send_newsletter_resend(
-            subject="Subj",
-            body=raw_markdown,
-            recipients=["r@test.com"]
-        )
+        send_newsletter_resend(subject="Subj", body=raw_markdown, recipients=["r@test.com"])
 
         call_args = mock_send.call_args[0][0]
 
@@ -102,11 +89,7 @@ class TestEmailSending:
         mock_send.return_value = {"error": "some_error"}
 
         with pytest.raises(RuntimeError, match="Resend did not return an ID"):
-            send_newsletter_resend(
-                subject="Subject",
-                body="Body",
-                recipients=["recipient@test.com"]
-            )
+            send_newsletter_resend(subject="Subject", body="Body", recipients=["recipient@test.com"])
 
         # Verify the error was logged
         assert "Resend did not return an ID" in caplog.text
