@@ -17,6 +17,9 @@ YOUTUBE_SEARCH_SELECTOR_LIST = "contents"
 YOUTUBE_SEARCH_SELECTOR_ITEM = "videoRenderer"
 YOUTUBE_SEARCH_SLEEP_SECONDS = 1
 
+# Transcript processing constants
+MAX_TRANSCRIPT_SEGMENTS = 1000  # Limit transcript segments to avoid context overflow
+
 
 def get_transcript_api() -> YouTubeTranscriptApi:
     """
@@ -227,8 +230,8 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
         if isinstance(transcript_data, list):
             # New format: list of dicts with text and start time
             transcript_formatted = ""
-            for segment in transcript_data[:1000]:  # Limit to avoid context overflow
-                timestamp_seconds = int(segment['start'])
+            for segment in transcript_data[:MAX_TRANSCRIPT_SEGMENTS]:
+                timestamp_seconds = round(segment['start'])
                 transcript_formatted += f"[{timestamp_seconds}s] {segment['text']} "
             context_block += f"Transcript (with timestamps in seconds): {transcript_formatted}\n\n"
         else:
