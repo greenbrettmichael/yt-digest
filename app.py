@@ -137,7 +137,6 @@ def get_recent_transcripts(url: str, limit: int = 10, api_client: YouTubeTranscr
         logging.info(f"Processing ({videos_processed + 1}/{limit}): {title} [{video_id}]")
         videos_processed += 1
 
-        transcript_text = ""
         try:
             transcript_list_obj = transcript_api.list(video_id)
 
@@ -157,8 +156,8 @@ def get_recent_transcripts(url: str, limit: int = 10, api_client: YouTubeTranscr
             # fetch() returns a list of dictionaries with 'text', 'start', and 'duration'
             fetched_transcript = transcript_obj.fetch()
 
-            # Combine the text parts into a single string, discarding timestamps for now
-            transcript_text = " ".join([item.text for item in fetched_transcript])
+            # Preserve transcript items with timestamps
+            transcript_items = [{"text": item.text, "start": item.start} for item in fetched_transcript]
 
         except TranscriptsDisabled:
             logging.info(f"Transcripts are disabled for video ID: {video_id}")
@@ -170,7 +169,7 @@ def get_recent_transcripts(url: str, limit: int = 10, api_client: YouTubeTranscr
             logging.info(f"Error retrieving transcript for video ID: {video_id}: {str(e)}")
             continue
 
-        results_data.append({"video_id": video_id, "title": title, "transcript": transcript_text})
+        results_data.append({"video_id": video_id, "title": title, "transcript": transcript_items})
 
     return results_data
 
@@ -222,8 +221,19 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
         context_block += f"--- VIDEO {i} ---\n"
         context_block += f"Title: {item['title']}\n"
         context_block += f"Video ID: {item['video_id']}\n"
-        # Truncate very long transcripts if necessary (e.g., to 25k chars) to fit context
-        context_block += f"Transcript: {item['transcript'][:25000]}\n\n"
+
+        # Format transcript with timestamps
+        transcript_data = item['transcript']
+        if isinstance(transcript_data, list):
+            # New format: list of dicts with text and start time
+            transcript_formatted = ""
+            for segment in transcript_data[:1000]:  # Limit to avoid context overflow
+                timestamp_seconds = int(segment['start'])
+                transcript_formatted += f"[{timestamp_seconds}s] {segment['text']} "
+            context_block += f"Transcript (with timestamps in seconds): {transcript_formatted}\n\n"
+        else:
+            # Fallback for old format: plain text string
+            context_block += f"Transcript: {transcript_data[:25000]}\n\n"
 
     # Define the System Prompt
     system_prompt = (
@@ -233,7 +243,7 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
 
     # Define the User Prompt
     user_prompt = f"""
-    Here are the transcripts from the most recent videos.
+    Here are the transcripts from the most recent videos with timestamps.
 
     Please write a Newsletter Digest in Markdown format.
 
@@ -249,9 +259,16 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
     Link: [Watch on YouTube](https://www.youtube.com/watch?v=<Video ID>)
     Key Takeaways:
 
-    - <Bullet 1: Specific, actionable detail>
-    - <Bullet 2: Specific, actionable detail>
+    - **[MM:SS](https://www.youtube.com/watch?v=<Video ID>&t=<seconds>s)** - <Bullet 1: Specific, actionable detail>
+    - **[MM:SS](https://www.youtube.com/watch?v=<Video ID>&t=<seconds>s)** - <Bullet 2: Specific, actionable detail>
     ... (Provide between 2 and 5 bullet points. Use fewer for short/simple videos, and more for dense/complex technical content.)
+
+    **IMPORTANT TIMESTAMP FORMATTING:**
+    - Each bullet point MUST start with a timestamp in the format [MM:SS] that links to that moment in the video.
+    - Convert the timestamp seconds from the transcript to MM:SS format (e.g., 125 seconds becomes 02:05).
+    - The timestamp should link to: https://www.youtube.com/watch?v=<Video ID>&t=<seconds>s
+    - Choose the timestamp that best represents when that specific takeaway is discussed in the video.
+    - Make the timestamp bold and followed by " - " before the bullet text.
 
     **(IMPORTANT: You must leave a blank line between 'Key Takeaways:' and the first bullet point so the list renders correctly.)**
     ---
