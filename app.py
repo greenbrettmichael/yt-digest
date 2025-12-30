@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from xml.etree.ElementTree import Element, SubElement
 
 import markdown
@@ -351,12 +351,12 @@ def save_results_to_json(results: list[dict], filename: str):
         raise
 
 
-def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2025-08-07") -> str:
+def generate_video_summary(json_data: list[dict], model: str = "gpt-5-mini-2025-08-07") -> str:
     """
-    Sends transcript data to OpenAI to generate a newsletter digest for each video.
+    Sends transcript data to OpenAI to generate a video summary.
 
     Args:
-        json_data (list[dict]): The list of video dictionaries.
+        json_data (list[dict]): A list containing a single video dictionary with transcript data.
         model (str): The OpenAI model to use (default: "gpt-5-mini-2025-08-07").
 
     Returns:
@@ -435,7 +435,7 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
 
     # Define the User Prompt
     user_prompt = f"""
-    Here are the transcripts from the most recent videos with timestamps.
+    Here are the transcripts from the video with timestamps.
 
     Please write a summary for the video in Markdown format.
 
@@ -497,9 +497,14 @@ def generate_rss_feed(summaries: list[dict], output_file: str = "feed.xml"):
 
     The function overwrites the output file on each execution.
     """
+    from xml.etree.ElementTree import register_namespace
+
+    # Register the Atom namespace
+    register_namespace("atom", "http://www.w3.org/2005/Atom")
+
     # Create the root RSS element
     rss = Element("rss", version="2.0")
-    rss.set("{http://www.w3.org/2005/Atom}atom", "http://www.w3.org/2005/Atom")
+    rss.set("{http://www.w3.org/2005/Atom}xmlns", "http://www.w3.org/2005/Atom")
     channel = SubElement(rss, "channel")
 
     # Add channel metadata
@@ -508,11 +513,22 @@ def generate_rss_feed(summaries: list[dict], output_file: str = "feed.xml"):
     SubElement(channel, "description").text = "AI-powered summaries of YouTube videos"
     SubElement(channel, "language").text = "en-us"
 
-    # Add atom:link for self-reference
+    # Add atom:link for self-reference with proper URL
+    # Get base URL from environment variable or use default
+    base_url = os.getenv("FEED_BASE_URL", "https://example.com/")
+    if not base_url.endswith("/"):
+        base_url += "/"
+
+    # Construct the full feed URL
+    if output_file.startswith("http://") or output_file.startswith("https://"):
+        feed_self_url = output_file
+    else:
+        feed_self_url = base_url + output_file.lstrip("/")
+
     SubElement(
         channel,
         "{http://www.w3.org/2005/Atom}link",
-        href=output_file,
+        href=feed_self_url,
         rel="self",
         type="application/rss+xml"
     )
@@ -558,6 +574,8 @@ def _prettify_xml(elem: Element, level: int = 0) -> str:
     """
     Returns a pretty-printed XML string for the Element.
 
+    Only adds indentation to structural elements, preserving text content in leaf elements.
+
     Args:
         elem: XML Element to prettify
         level: Current indentation level
@@ -565,27 +583,68 @@ def _prettify_xml(elem: Element, level: int = 0) -> str:
     Returns:
         str: Formatted XML string
     """
+    import copy
     from xml.etree.ElementTree import tostring
+
+    # Work on a copy to avoid modifying the original
+    elem_copy = copy.deepcopy(elem)
 
     indent = "  "
     i = "\n" + level * indent
+
+    if len(elem_copy):
+        # This element has children - add structural indentation
+        # Only modify text/tail if they're empty or whitespace-only
+        if not elem_copy.text or not elem_copy.text.strip():
+            elem_copy.text = i + indent
+        if not elem_copy.tail or not elem_copy.tail.strip():
+            elem_copy.tail = i
+
+        last_child = None
+        for child in elem_copy:
+            _prettify_xml_inplace(child, level + 1)
+            last_child = child
+
+        if last_child is not None and (not last_child.tail or not last_child.tail.strip()):
+            last_child.tail = i
+    else:
+        # Leaf element - only adjust tail, preserve text content
+        if level and (not elem_copy.tail or not elem_copy.tail.strip()):
+            elem_copy.tail = i
+
+    # Convert to string
+    return tostring(elem_copy, encoding="unicode")
+
+
+def _prettify_xml_inplace(elem: Element, level: int = 0) -> None:
+    """
+    Helper function to prettify XML in-place for recursive calls.
+
+    Args:
+        elem: XML Element to prettify
+        level: Current indentation level
+    """
+    indent = "  "
+    i = "\n" + level * indent
+
     if len(elem):
+        # This element has children - add structural indentation
         if not elem.text or not elem.text.strip():
             elem.text = i + indent
         if not elem.tail or not elem.tail.strip():
             elem.tail = i
+
         last_child = None
         for child in elem:
-            _prettify_xml(child, level + 1)
+            _prettify_xml_inplace(child, level + 1)
             last_child = child
+
         if last_child is not None and (not last_child.tail or not last_child.tail.strip()):
             last_child.tail = i
     else:
+        # Leaf element - only adjust tail, preserve text content
         if level and (not elem.tail or not elem.tail.strip()):
             elem.tail = i
-
-    # Convert to string
-    return tostring(elem, encoding="unicode")
 
 
 if __name__ == "__main__":
@@ -646,18 +705,29 @@ if __name__ == "__main__":
                 logging.warning(f"No transcripts found for entry {idx + 1}, skipping...")
                 continue
 
+            # Deduplicate videos by video_id to avoid processing duplicates
+            # (e.g., same video from both channel and search URL)
+            seen_video_ids = set()
+            unique_data = []
+            for video in data:
+                video_id = video.get("video_id")
+                if video_id and video_id not in seen_video_ids:
+                    seen_video_ids.add(video_id)
+                    unique_data.append(video)
+            data = unique_data
+
             # Generate newsletter digest for each video individually to ensure one entry per video
             for video in data:
                 # Generate summary for single video
                 single_video_data = [video]
                 try:
-                    summary = generate_newsletter_digest(single_video_data)
+                    summary = generate_video_summary(single_video_data)
 
                     summary_entry = {
                         "title": video["title"],
                         "video_id": video["video_id"],
                         "summary": summary,
-                        "timestamp": datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
+                        "timestamp": datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
                     }
                     all_summaries.append(summary_entry)
                     logging.info(f"Generated summary for: {video['title']}")
