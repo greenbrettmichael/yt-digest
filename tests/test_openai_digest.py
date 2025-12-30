@@ -103,3 +103,66 @@ class TestNewsletterGeneration:
         # Check that the specific model was passed to the API
         call_args = mock_client.chat.completions.create.call_args
         assert call_args[1]["model"] == "gpt-4o-custom"
+
+    @patch("app.OpenAI")
+    def test_timestamp_integration(self, mock_openai_class, monkeypatch):
+        """Test that transcript data with timestamps is correctly formatted in the prompt."""
+        monkeypatch.setenv("OPENAI_API_KEY", "fake-test-key")
+
+        mock_client = mock_openai_class.return_value
+        mock_response = MagicMock()
+        mock_response.choices[0].message.content = "Success"
+        mock_client.chat.completions.create.return_value = mock_response
+
+        # Test data with new timestamp format
+        fake_data = [
+            {
+                "title": "Test Video",
+                "video_id": "abc123",
+                "transcript": [
+                    {"text": "Hello world", "start": 0},
+                    {"text": "This is a test", "start": 10.5},
+                    {"text": "End of video", "start": 125.7},
+                ],
+            }
+        ]
+
+        generate_newsletter_digest(fake_data)
+
+        # Verify the prompt includes timestamp instructions
+        call_args = mock_client.chat.completions.create.call_args
+        messages = call_args[1]["messages"]
+        user_prompt = messages[1]["content"]
+
+        # Check for timestamp formatting instructions
+        assert "MM:SS" in user_prompt
+        assert "timestamp" in user_prompt.lower()
+        assert "&t=" in user_prompt
+
+        # Check that transcript data includes timestamps
+        assert "[0s] Hello world" in user_prompt
+        assert "[10s] This is a test" in user_prompt
+        assert "[126s] End of video" in user_prompt  # 125.7 rounds to 126
+
+    @patch("app.OpenAI")
+    def test_backward_compatibility_with_string_transcript(self, mock_openai_class, monkeypatch):
+        """Test that old format (string transcript) still works as fallback."""
+        monkeypatch.setenv("OPENAI_API_KEY", "fake-test-key")
+
+        mock_client = mock_openai_class.return_value
+        mock_response = MagicMock()
+        mock_response.choices[0].message.content = "Success"
+        mock_client.chat.completions.create.return_value = mock_response
+
+        # Test data with old string format
+        fake_data = [{"title": "Test", "video_id": "123", "transcript": "This is plain text"}]
+
+        generate_newsletter_digest(fake_data)
+
+        # Verify it doesn't crash and uses the fallback
+        call_args = mock_client.chat.completions.create.call_args
+        messages = call_args[1]["messages"]
+        user_prompt = messages[1]["content"]
+
+        # Should still contain the transcript text
+        assert "This is plain text" in user_prompt

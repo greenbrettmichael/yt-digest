@@ -30,7 +30,7 @@ class TestTranscriptsHappyPath:
         # Verify
         assert len(results) == 2
         assert results[0]["video_id"] == "vid_1"
-        assert results[0]["transcript"] == "Hello world"
+        assert results[0]["transcript"] == [{"text": "Hello world", "start": 0}]
 
         # Check that we specifically looked for English
         mock_api_client.list.assert_any_call("vid_1")
@@ -48,7 +48,7 @@ class TestTranscriptsHappyPath:
         # Simulate: Fallback (Spanish) found via iterator
         mock_spanish_transcript = MagicMock()
         mock_spanish_transcript.language_code = "es"
-        mock_spanish_transcript.fetch.return_value = [SimpleNamespace(text="Hola mundo")]
+        mock_spanish_transcript.fetch.return_value = [SimpleNamespace(text="Hola mundo", start=0)]
         mock_list.__iter__.return_value = iter([mock_spanish_transcript])
 
         # Execute
@@ -56,7 +56,7 @@ class TestTranscriptsHappyPath:
 
         # Verify
         assert len(results) == 1
-        assert results[0]["transcript"] == "Hola mundo"
+        assert results[0]["transcript"] == [{"text": "Hola mundo", "start": 0}]
 
 
 class TestTranscriptsEdgeCases:
