@@ -226,10 +226,11 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
         transcript_data = item['transcript']
         if isinstance(transcript_data, list):
             # New format: list of dicts with text and start time
-            transcript_formatted = ""
+            segments = []
             for segment in transcript_data:
                 timestamp_seconds = round(segment['start'])
-                transcript_formatted += f"[{timestamp_seconds}s] {segment['text']} "
+                segments.append(f"[{timestamp_seconds}s] {segment['text']} ")
+            transcript_formatted = "".join(segments)
             context_block += f"Transcript (with timestamps in seconds): {transcript_formatted}\n\n"
         else:
             # Fallback for old format: plain text string
