@@ -493,13 +493,14 @@ def generate_rss_feed(summaries: list[dict], output_file: str = "feed.xml"):
             - title (str): Video title
             - video_id (str): YouTube video ID
             - summary (str): Markdown summary of the video
-            - timestamp (str): ISO 8601 timestamp for the entry
+            - timestamp (str): RFC 2822 formatted timestamp (e.g., "Mon, 01 Jan 2024 12:00:00 GMT")
         output_file (str): Path to output RSS file (default: "feed.xml")
 
     The function overwrites the output file on each execution.
     """
     # Create the root RSS element
-    rss = Element("rss", version="2.0", attrib={"xmlns:atom": "http://www.w3.org/2005/Atom"})
+    rss = Element("rss", version="2.0")
+    rss.set("{http://www.w3.org/2005/Atom}atom", "http://www.w3.org/2005/Atom")
     channel = SubElement(rss, "channel")
 
     # Add channel metadata
@@ -571,10 +572,12 @@ def _prettify_xml(elem: Element, level: int = 0) -> str:
             elem.text = i + indent
         if not elem.tail or not elem.tail.strip():
             elem.tail = i
+        last_child = None
         for child in elem:
             _prettify_xml(child, level + 1)
-        if not child.tail or not child.tail.strip():
-            child.tail = i
+            last_child = child
+        if last_child is not None and (not last_child.tail or not last_child.tail.strip()):
+            last_child.tail = i
     else:
         if level and (not elem.tail or not elem.tail.strip()):
             elem.tail = i

@@ -118,7 +118,8 @@ class TestRSSFeedGeneration:
 
         assert len(items) == 1
         assert items[0].find("title").text == "New Video"
-        assert items[0].find("video_id") is None or items[0].find("video_id").text != "old123"
+        # Verify the guid changed (old video ID should not be present)
+        assert items[0].find("guid").text == "new123"
 
     def test_generate_rss_feed_truncates_long_summary(self, tmp_path):
         """Test that very long summaries are truncated."""
