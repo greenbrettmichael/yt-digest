@@ -702,7 +702,7 @@ if __name__ == "__main__":
                 data.extend(search_data)
 
             if not data:
-                logging.warning(f"No transcripts found for entry {idx + 1}, skipping...")
+                logging.info(f"No transcripts found for entry {idx + 1}, skipping...")
                 continue
 
             # Deduplicate videos by video_id to avoid processing duplicates
@@ -747,4 +747,5 @@ if __name__ == "__main__":
         generate_rss_feed(all_summaries, output_file="feed.xml")
         logging.info(f"\nRSS feed generation complete! Total entries: {len(all_summaries)}")
     else:
-        logging.warning("No summaries generated. RSS feed not created.")
+        generate_rss_feed(all_summaries, output_file="feed.xml")
+        logging.info("No summaries generated. RSS feed will be blank.")
