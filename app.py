@@ -53,7 +53,14 @@ def load_email_list_config(config_path: str = "email_list.json") -> list[dict]:
     Returns:
         list[dict]: A list of validated configuration entries, each containing:
             - email (str): Recipient email address
-            - search_url (str): YouTube search URL
+            - search_url (str, optional): YouTube search URL
+            - channel_id (str, optional): YouTube channel ID
+            - channel_url (str, optional): YouTube channel URL
+            - channel_username (str, optional): YouTube channel username
+
+    Note:
+        Each entry must have either a search_url OR at least one channel field
+        (channel_id, channel_url, or channel_username).
 
     Raises:
         FileNotFoundError: If the configuration file doesn't exist.
@@ -78,20 +85,44 @@ def load_email_list_config(config_path: str = "email_list.json") -> list[dict]:
 
         email = entry.get("email")
         search_url = entry.get("search_url")
+        channel_id = entry.get("channel_id")
+        channel_url = entry.get("channel_url")
+        channel_username = entry.get("channel_username")
 
         if not email or not isinstance(email, str) or not email.strip():
             logging.warning(f"Entry at index {idx} missing or invalid 'email' field")
-            continue
-
-        if not search_url or not isinstance(search_url, str) or not search_url.strip():
-            logging.warning(f"Entry at index {idx} missing or invalid 'search_url' field")
             continue
 
         # Basic email format validation
         if "@" not in email:
             logging.warning(f"Entry at index {idx} has invalid email format")
             continue
-        validated_entries.append({"email": email.strip(), "search_url": search_url.strip()})
+
+        # Validate that at least one source is provided (search_url OR channel)
+        has_search_url = search_url and isinstance(search_url, str) and search_url.strip()
+        has_channel_id = channel_id and isinstance(channel_id, str) and channel_id.strip()
+        has_channel_url = channel_url and isinstance(channel_url, str) and channel_url.strip()
+        has_channel_username = channel_username and isinstance(channel_username, str) and channel_username.strip()
+
+        if not (has_search_url or has_channel_id or has_channel_url or has_channel_username):
+            logging.warning(
+                f"Entry at index {idx} missing valid 'search_url' or channel field "
+                "(channel_id, channel_url, or channel_username)"
+            )
+            continue
+
+        # Build validated entry
+        validated_entry = {"email": email.strip()}
+        if has_search_url and search_url:
+            validated_entry["search_url"] = search_url.strip()
+        if has_channel_id and channel_id:
+            validated_entry["channel_id"] = channel_id.strip()
+        if has_channel_url and channel_url:
+            validated_entry["channel_url"] = channel_url.strip()
+        if has_channel_username and channel_username:
+            validated_entry["channel_username"] = channel_username.strip()
+
+        validated_entries.append(validated_entry)
 
     if len(validated_entries) == 0:
         logging.warning("Configuration file contains no valid entries")
@@ -99,6 +130,139 @@ def load_email_list_config(config_path: str = "email_list.json") -> list[dict]:
 
     logging.info(f"Successfully loaded {len(validated_entries)} configuration entries from {config_path}")
     return validated_entries
+
+
+def is_video_within_last_day(video: dict) -> bool:
+    """
+    Checks if a video was published within the last 24 hours.
+
+    Args:
+        video (dict): A video dictionary from scrapetube containing publishedTimeText.
+
+    Returns:
+        bool: True if the video was published within the last 24 hours, False otherwise.
+    """
+    try:
+        published_text = video.get("publishedTimeText", {}).get("simpleText", "")
+        if not published_text:
+            return False
+
+        # Parse relative time strings like "2 hours ago", "1 day ago", etc.
+        published_text_lower = published_text.lower()
+
+        # Check for videos from within the last day
+        if "minute" in published_text_lower or "hour" in published_text_lower:
+            return True
+        elif "day" in published_text_lower:
+            # Extract the number of days
+            parts = published_text_lower.split()
+            try:
+                num_days = int(parts[0])
+                return num_days <= 1
+            except (ValueError, IndexError):
+                return False
+        else:
+            # Anything else (weeks, months, years) is not within the last day
+            return False
+    except Exception as e:
+        logging.warning(f"Error parsing video publish date: {e}")
+        return False
+
+
+def get_channel_videos_last_day(
+    channel_id: str | None = None,
+    channel_url: str | None = None,
+    channel_username: str | None = None,
+    api_client: YouTubeTranscriptApi | None = None,
+) -> list[dict]:
+    """
+    Retrieves videos from a channel that were published within the last 24 hours.
+
+    Args:
+        channel_id (str, optional): The YouTube channel ID.
+        channel_url (str, optional): The YouTube channel URL.
+        channel_username (str, optional): The YouTube channel username (without @).
+        api_client (YouTubeTranscriptApi, optional): An instance of YouTubeTranscriptApi.
+
+    Returns:
+        list[dict]: List of dictionaries containing video_id, title, and transcript.
+    """
+    channel_identifier = channel_id or channel_url or channel_username
+    logging.info(f"Fetching videos from channel: {channel_identifier}")
+
+    try:
+        # Get videos from the channel, sorted by newest first
+        channel_videos = scrapetube.get_channel(
+            channel_id=channel_id,
+            channel_url=channel_url,
+            channel_username=channel_username,
+            sort_by="newest",
+            sleep=YOUTUBE_SEARCH_SLEEP_SECONDS,
+        )
+
+        # Filter videos from the last 24 hours
+        recent_videos = []
+        for video in channel_videos:
+            if is_video_within_last_day(video):
+                recent_videos.append(video)
+            else:
+                # Since videos are sorted by newest, we can stop once we hit an older video
+                break
+
+        logging.info(f"Found {len(recent_videos)} videos from the last 24 hours for channel: {channel_identifier}")
+
+        # Process transcripts for the recent videos
+        results_data = []
+        transcript_api = api_client or get_transcript_api()
+
+        for video in recent_videos:
+            video_id = video.get("videoId")
+            try:
+                title = video["title"]["runs"][0]["text"]
+            except (KeyError, IndexError):
+                title = "Unknown Title"
+
+            logging.info(f"Processing channel video: {title} [{video_id}]")
+
+            try:
+                transcript_list_obj = transcript_api.list(video_id)
+
+                # Try to find English variants first
+                try:
+                    transcript_obj = transcript_list_obj.find_transcript(["en", "en-US", "en-GB"])
+                    logging.info(
+                        f"Found English transcript for video ID: {video_id} with language code: {transcript_obj.language_code}"
+                    )
+                except:
+                    # Fallback: If no English, just take the first available one
+                    transcript_obj = next(iter(transcript_list_obj))
+                    logging.info(
+                        f"No English transcript found. Using available transcript with language code: {transcript_obj.language_code} for video ID: {video_id}"
+                    )
+
+                # fetch() returns a list of dictionaries with 'text', 'start', and 'duration'
+                fetched_transcript = transcript_obj.fetch()
+
+                # Preserve transcript items with timestamps
+                transcript_items = [{"text": item.text, "start": item.start} for item in fetched_transcript]
+
+            except TranscriptsDisabled:
+                logging.info(f"Transcripts are disabled for video ID: {video_id}")
+                continue
+            except NoTranscriptFound:
+                logging.info(f"No transcript found for video ID: {video_id}.")
+                continue
+            except Exception as e:
+                logging.info(f"Error retrieving transcript for video ID: {video_id}: {str(e)}")
+                continue
+
+            results_data.append({"video_id": video_id, "title": title, "transcript": transcript_items})
+
+        return results_data
+
+    except Exception as e:
+        logging.error(f"Error fetching channel videos: {e}")
+        return []
 
 
 def get_recent_transcripts(url: str, limit: int = 10, api_client: YouTubeTranscriptApi | None = None) -> list[dict]:
@@ -438,17 +602,37 @@ if __name__ == "__main__":
     # Process each configuration entry
     for idx, entry in enumerate(config_entries):
         recipient_email = entry["email"]
-        search_url = entry["search_url"]
+        search_url = entry.get("search_url")
+        channel_id = entry.get("channel_id")
+        channel_url = entry.get("channel_url")
+        channel_username = entry.get("channel_username")
 
         logging.info(f"\n{'=' * 60}")
         logging.info(f"Processing entry {idx + 1}/{len(config_entries)}")
         logging.info(f"Recipient: {recipient_email}")
-        logging.info(f"Search URL: {search_url}")
+        if search_url:
+            logging.info(f"Search URL: {search_url}")
+        if channel_id:
+            logging.info(f"Channel ID: {channel_id}")
+        if channel_url:
+            logging.info(f"Channel URL: {channel_url}")
+        if channel_username:
+            logging.info(f"Channel Username: {channel_username}")
         logging.info(f"{'=' * 60}\n")
 
         try:
-            # Fetch transcripts
-            data = get_recent_transcripts(search_url, limit=2)
+            # Fetch transcripts from channels (if specified)
+            data = []
+            if channel_id or channel_url or channel_username:
+                channel_data = get_channel_videos_last_day(
+                    channel_id=channel_id, channel_url=channel_url, channel_username=channel_username
+                )
+                data.extend(channel_data)
+
+            # Also fetch from search URL if specified
+            if search_url:
+                search_data = get_recent_transcripts(search_url, limit=2)
+                data.extend(search_data)
 
             if not data:
                 logging.warning(f"No transcripts found for {recipient_email}, skipping...")
