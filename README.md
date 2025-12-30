@@ -91,23 +91,53 @@ Create an `email_list.json` file in the project root directory with the followin
     },
     {
         "email": "user2@example.com",
-        "search_url": "https://www.youtube.com/results?search_query=ai+news&sp=EgIIAw%253D%253D"
+        "channel_username": "LinusTechTips"
+    },
+    {
+        "email": "user3@example.com",
+        "channel_id": "UC8butISFwT-Wl7EV0hUK0BQ"
+    },
+    {
+        "email": "user4@example.com",
+        "channel_url": "https://www.youtube.com/@mkbhd"
+    },
+    {
+        "email": "user5@example.com",
+        "channel_username": "ThePrimeagen",
+        "search_url": "https://www.youtube.com/results?search_query=programming&sp=EgIIAw%253D%253D"
     }
 ]
 ```
 
 **Configuration File Format:**
 - The file must be a JSON array of objects
-- Each object represents a recipient/search URL pairing
+- Each object represents a recipient and their video sources
 - Required fields for each entry:
   - `email`: Recipient email address (must contain '@')
-  - `search_url`: Full YouTube search URL (see below for how to construct)
+  - At least one video source (can have multiple):
+    - `search_url`: Full YouTube search URL for keyword-based searches
+    - `channel_id`: YouTube channel ID (e.g., "UC8butISFwT-Wl7EV0hUK0BQ")
+    - `channel_url`: YouTube channel URL (e.g., "https://www.youtube.com/@mkbhd")
+    - `channel_username`: YouTube channel username without @ (e.g., "LinusTechTips")
+
+**Using Channel Sources:**
+- When you specify a channel (via `channel_id`, `channel_url`, or `channel_username`), the tool will:
+  - Query the channel for videos published in the last 24 hours
+  - Process transcripts for all videos found
+  - Include them in the newsletter digest
+- You can specify multiple sources per recipient (e.g., both a channel and a search URL)
+- Channel videos are fetched using `scrapetube.get_channel()` sorted by newest first
 
 **How to Construct YouTube Search URLs:**
 1. Go to YouTube and perform your desired search
 2. Apply any filters (upload date, duration, etc.)
 3. Copy the complete URL from your browser's address bar
 4. The URL should include the `sp` parameter for filters, e.g., `sp=EgIIAw%253D%253D` for videos uploaded this week
+
+**Finding Channel Identifiers:**
+- **Channel Username**: The handle shown on the channel page (without the @), e.g., "LinusTechTips"
+- **Channel URL**: The full URL to the channel page, e.g., "https://www.youtube.com/@mkbhd"
+- **Channel ID**: Found in the page source or channel URL, e.g., "UC8butISFwT-Wl7EV0hUK0BQ"
 
 **Example:** An `email_list.json.example` file is provided in the repository for reference.
 
@@ -121,10 +151,12 @@ python app.py
 
 - The application processes each entry in the configuration file
 - For each entry, it will:
-  1. Fetch transcripts for up to 2 videos matching the search URL
-  2. Generate an AI newsletter digest
-  3. Send the personalized newsletter to the recipient email
+  1. Fetch videos from the last 24 hours from any specified channels
+  2. Fetch transcripts for videos matching any search URLs
+  3. Generate an AI newsletter digest
+  4. Send the personalized newsletter to the recipient email
 - If any entry fails, the application logs the error and continues with the next entry
+- The tool logs the number of videos found and which channels were processed
 
 ### Core Functionality
 

@@ -98,7 +98,7 @@ class TestEmailListConfig:
         assert "Entry at index 0 missing or invalid 'email' field" in caplog.text
 
     def test_load_config_missing_search_url_field(self, tmp_path, caplog):
-        """Test error handling when search_url field is missing."""
+        """Test error handling when search_url field is missing and no channel fields provided."""
         config_file = tmp_path / "email_list.json"
         config_data = [{"email": "user@example.com"}]
         config_file.write_text(json.dumps(config_data))
@@ -106,10 +106,10 @@ class TestEmailListConfig:
         caplog.set_level(logging.WARNING)
         validated = load_email_list_config(str(config_file))
         assert len(validated) == 0
-        assert "Entry at index 0 missing or invalid 'search_url' field" in caplog.text
+        assert "missing valid 'search_url' or channel field" in caplog.text
 
     def test_load_config_empty_search_url_field(self, tmp_path, caplog):
-        """Test error handling when search_url field is empty."""
+        """Test error handling when search_url field is empty and no channel fields provided."""
         config_file = tmp_path / "email_list.json"
         config_data = [{"email": "user@example.com", "search_url": ""}]
         config_file.write_text(json.dumps(config_data))
@@ -117,7 +117,7 @@ class TestEmailListConfig:
         caplog.set_level(logging.WARNING)
         validated = load_email_list_config(str(config_file))
         assert len(validated) == 0
-        assert "Entry at index 0 missing or invalid 'search_url' field" in caplog.text
+        assert "missing valid 'search_url' or channel field" in caplog.text
 
     def test_load_config_invalid_email_format(self, tmp_path, caplog):
         """Test error handling for invalid email format (no @ symbol)."""
@@ -165,7 +165,7 @@ class TestEmailListConfig:
         assert "Entry at index 0 missing or invalid 'email' field" in caplog.text
 
     def test_load_config_non_string_url(self, tmp_path, caplog):
-        """Test error handling when search_url is not a string."""
+        """Test error handling when search_url is not a string and no channel fields provided."""
         config_file = tmp_path / "email_list.json"
         config_data = [{"email": "user@example.com", "search_url": 12345}]
         config_file.write_text(json.dumps(config_data))
@@ -173,7 +173,7 @@ class TestEmailListConfig:
         caplog.set_level(logging.WARNING)
         validated = load_email_list_config(str(config_file))
         assert len(validated) == 0
-        assert "Entry at index 0 missing or invalid 'search_url' field" in caplog.text
+        assert "missing valid 'search_url' or channel field" in caplog.text
 
     def test_load_config_multiple_entries_partial_valid(self, tmp_path, caplog):
         """Test that validation continues and filters out invalid entries."""
@@ -191,3 +191,119 @@ class TestEmailListConfig:
         assert validated[0]["email"] == "user1@example.com"
         assert validated[1]["email"] == "user3@example.com"
         assert "Entry at index 1 has invalid email format" in caplog.text
+
+    def test_load_config_with_channel_id(self, tmp_path):
+        """Test loading configuration with channel_id field."""
+        config_file = tmp_path / "email_list.json"
+        config_data = [{"email": "user@example.com", "channel_id": "UC8butISFwT-Wl7EV0hUK0BQ"}]
+        config_file.write_text(json.dumps(config_data))
+
+        result = load_email_list_config(str(config_file))
+
+        assert len(result) == 1
+        assert result[0]["email"] == "user@example.com"
+        assert result[0]["channel_id"] == "UC8butISFwT-Wl7EV0hUK0BQ"
+        assert "search_url" not in result[0]
+
+    def test_load_config_with_channel_url(self, tmp_path):
+        """Test loading configuration with channel_url field."""
+        config_file = tmp_path / "email_list.json"
+        config_data = [{"email": "user@example.com", "channel_url": "https://www.youtube.com/@mkbhd"}]
+        config_file.write_text(json.dumps(config_data))
+
+        result = load_email_list_config(str(config_file))
+
+        assert len(result) == 1
+        assert result[0]["email"] == "user@example.com"
+        assert result[0]["channel_url"] == "https://www.youtube.com/@mkbhd"
+
+    def test_load_config_with_channel_username(self, tmp_path):
+        """Test loading configuration with channel_username field."""
+        config_file = tmp_path / "email_list.json"
+        config_data = [{"email": "user@example.com", "channel_username": "LinusTechTips"}]
+        config_file.write_text(json.dumps(config_data))
+
+        result = load_email_list_config(str(config_file))
+
+        assert len(result) == 1
+        assert result[0]["email"] == "user@example.com"
+        assert result[0]["channel_username"] == "LinusTechTips"
+
+    def test_load_config_with_multiple_sources(self, tmp_path):
+        """Test loading configuration with both search_url and channel fields."""
+        config_file = tmp_path / "email_list.json"
+        config_data = [
+            {
+                "email": "user@example.com",
+                "search_url": "https://www.youtube.com/results?search_query=python",
+                "channel_username": "LinusTechTips",
+                "channel_id": "UC8butISFwT-Wl7EV0hUK0BQ",
+            }
+        ]
+        config_file.write_text(json.dumps(config_data))
+
+        result = load_email_list_config(str(config_file))
+
+        assert len(result) == 1
+        assert result[0]["email"] == "user@example.com"
+        assert result[0]["search_url"] == "https://www.youtube.com/results?search_query=python"
+        assert result[0]["channel_username"] == "LinusTechTips"
+        assert result[0]["channel_id"] == "UC8butISFwT-Wl7EV0hUK0BQ"
+
+    def test_load_config_channel_only_no_search_url(self, tmp_path):
+        """Test that entries with channel fields but no search_url are valid."""
+        config_file = tmp_path / "email_list.json"
+        config_data = [{"email": "user@example.com", "channel_id": "UC123"}]
+        config_file.write_text(json.dumps(config_data))
+
+        result = load_email_list_config(str(config_file))
+
+        assert len(result) == 1
+        assert "search_url" not in result[0]
+        assert result[0]["channel_id"] == "UC123"
+
+    def test_load_config_missing_all_sources(self, tmp_path, caplog):
+        """Test that entries without search_url or channel fields are rejected."""
+        config_file = tmp_path / "email_list.json"
+        config_data = [{"email": "user@example.com"}]
+        config_file.write_text(json.dumps(config_data))
+
+        caplog.set_level(logging.WARNING)
+        result = load_email_list_config(str(config_file))
+
+        assert len(result) == 0
+        assert "missing valid 'search_url' or channel field" in caplog.text
+
+    def test_load_config_empty_channel_fields(self, tmp_path, caplog):
+        """Test that empty channel fields are ignored."""
+        config_file = tmp_path / "email_list.json"
+        config_data = [{"email": "user@example.com", "channel_id": "", "channel_url": "   "}]
+        config_file.write_text(json.dumps(config_data))
+
+        caplog.set_level(logging.WARNING)
+        result = load_email_list_config(str(config_file))
+
+        assert len(result) == 0
+        assert "missing valid 'search_url' or channel field" in caplog.text
+
+    def test_load_config_strips_channel_whitespace(self, tmp_path):
+        """Test that channel fields are stripped of whitespace."""
+        config_file = tmp_path / "email_list.json"
+        config_data = [{"email": "user@example.com", "channel_username": "  LinusTechTips  "}]
+        config_file.write_text(json.dumps(config_data))
+
+        result = load_email_list_config(str(config_file))
+
+        assert result[0]["channel_username"] == "LinusTechTips"
+
+    def test_load_config_non_string_channel_fields(self, tmp_path, caplog):
+        """Test that non-string channel fields are ignored."""
+        config_file = tmp_path / "email_list.json"
+        config_data = [{"email": "user@example.com", "channel_id": 12345}]
+        config_file.write_text(json.dumps(config_data))
+
+        caplog.set_level(logging.WARNING)
+        result = load_email_list_config(str(config_file))
+
+        assert len(result) == 0
+        assert "missing valid 'search_url' or channel field" in caplog.text
