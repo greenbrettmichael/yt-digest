@@ -31,7 +31,7 @@ class TestNewsletterGeneration:
         mock_client = mock_openai_class.return_value
         mock_response = MagicMock()
         mock_response.choices[0].message.content = (
-            "### Title: Test\nLink: [Watch on YouTube](https://...)\nKey Takeaways:\n\n- Point 1"
+            "Key Takeaways:\n\n- **[00:12](https://www.youtube.com/watch?v=vid123&t=12s)** - Point 1"
         )
         mock_client.chat.completions.create.return_value = mock_response
 
@@ -43,7 +43,7 @@ class TestNewsletterGeneration:
         result = generate_newsletter_digest(fake_data)
 
         # 4. Assertions
-        assert "### Title: Test" in result
+        assert "Key Takeaways:" in result
 
         # Verify the API was initialized with the key
         mock_openai_class.assert_called_with(api_key="fake-test-key")
@@ -61,11 +61,11 @@ class TestNewsletterGeneration:
         assert "expert tech newsletter editor" in messages[0]["content"]
         assert messages[1]["role"] == "user"
         # Check for specific formatting rules we added
-        assert "Do NOT include a main headline" in messages[1]["content"]
+        assert "Do NOT include a title, headline" in messages[1]["content"]
         assert "Provide between 2 and 5 bullet points" in messages[1]["content"]
         # Check that our data was injected
         assert "Video ID: vid123" in messages[1]["content"]
-        assert "[Watch on YouTube]" in result
+        assert "[Watch on YouTube]" in result or "Key Takeaways" in result
 
     @patch("app.OpenAI")
     def test_api_failure_raises_runtime_error(self, mock_openai_class, monkeypatch, caplog):

@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 from xml.etree.ElementTree import Element, SubElement
 
+import markdown
 import scrapetube
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -436,18 +437,17 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
     user_prompt = f"""
     Here are the transcripts from the most recent videos with timestamps.
 
-    Please write a Newsletter Digest in Markdown format.
+    Please write a summary for the video in Markdown format.
 
     **Strict Formatting Rules:**
-    1. Do NOT include a main headline or title at the top.
-    2. Do NOT include an Executive Summary or Intro.
-    3. Start directly with the list of videos.
-    4. Do NOT include a "TL;DR" line for the videos.
-    5. Do NOT include any concluding remarks, "If you want...", or offers for further instructions at the end.
+    1. Do NOT include a title, headline, or "Title:" line at the top.
+    2. Do NOT include a link to the video.
+    3. Do NOT include an Executive Summary or Intro.
+    4. Start directly with "Key Takeaways:" as the first line.
+    5. Do NOT include a "TL;DR" line.
+    6. Do NOT include any concluding remarks, "If you want...", or offers for further instructions at the end.
 
-    **Structure for each video:**
-    ### Title: <Original Video Title>
-    Link: [Watch on YouTube](https://www.youtube.com/watch?v=<Video ID>)
+    **Structure:**
     Key Takeaways:
 
     - **[MM:SS](https://www.youtube.com/watch?v=<Video ID>&t=<seconds>s)** - <Bullet 1: Specific, actionable detail>
@@ -462,7 +462,6 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
     - Make the timestamp bold and followed by " - " before the bullet text.
 
     **(IMPORTANT: You must leave a blank line between 'Key Takeaways:' and the first bullet point so the list renders correctly.)**
-    ---
 
     Data:
     {context_block}
@@ -533,9 +532,12 @@ def generate_rss_feed(summaries: list[dict], output_file: str = "feed.xml"):
         if len(summary) > max_summary_length:
             summary = summary[:max_summary_length] + "\n\n[Summary truncated due to length]"
 
-        # Use CDATA section for description to preserve formatting
+        # Convert Markdown to HTML for proper rendering in RSS readers
+        html_content = markdown.markdown(summary, extensions=["nl2br"])
+
+        # Add description with proper CDATA handling
         description = SubElement(item, "description")
-        description.text = f"<![CDATA[{summary}]]>"
+        description.text = html_content
 
     # Write to file (overwrite existing)
     try:
