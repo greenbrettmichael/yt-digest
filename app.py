@@ -17,9 +17,6 @@ YOUTUBE_SEARCH_SELECTOR_LIST = "contents"
 YOUTUBE_SEARCH_SELECTOR_ITEM = "videoRenderer"
 YOUTUBE_SEARCH_SLEEP_SECONDS = 1
 
-# Transcript processing constants
-MAX_TRANSCRIPT_SEGMENTS = 1000  # Limit transcript segments to avoid context overflow
-
 
 def get_transcript_api() -> YouTubeTranscriptApi:
     """
@@ -230,7 +227,7 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
         if isinstance(transcript_data, list):
             # New format: list of dicts with text and start time
             transcript_formatted = ""
-            for segment in transcript_data[:MAX_TRANSCRIPT_SEGMENTS]:
+            for segment in transcript_data:
                 timestamp_seconds = round(segment['start'])
                 transcript_formatted += f"[{timestamp_seconds}s] {segment['text']} "
             context_block += f"Transcript (with timestamps in seconds): {transcript_formatted}\n\n"
@@ -264,7 +261,7 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
 
     - **[MM:SS](https://www.youtube.com/watch?v=<Video ID>&t=<seconds>s)** - <Bullet 1: Specific, actionable detail>
     - **[MM:SS](https://www.youtube.com/watch?v=<Video ID>&t=<seconds>s)** - <Bullet 2: Specific, actionable detail>
-    ... (Provide between 2 and 5 bullet points. Use fewer for short/simple videos, and more for dense/complex technical content.)
+    ... (Provide between 2 and 10 bullet points. Use fewer for short/simple videos, and more for dense/complex technical content.)
 
     **IMPORTANT TIMESTAMP FORMATTING:**
     - Each bullet point MUST start with a timestamp in the format [MM:SS] that links to that moment in the video.
