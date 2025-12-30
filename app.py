@@ -1,10 +1,9 @@
 import json
 import logging
 import os
-import textwrap
+from datetime import datetime
+from xml.etree.ElementTree import Element, SubElement
 
-import markdown
-import resend
 import scrapetube
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -43,16 +42,15 @@ def get_transcript_api() -> YouTubeTranscriptApi:
     return ytt_api
 
 
-def load_email_list_config(config_path: str = "email_list.json") -> list[dict]:
+def load_queries_config(config_path: str = "queries.json") -> list[dict]:
     """
-    Loads and validates the email list configuration from a JSON file.
+    Loads and validates the queries configuration from a JSON file.
 
     Args:
-        config_path (str): Path to the email_list.json configuration file.
+        config_path (str): Path to the queries.json configuration file.
 
     Returns:
         list[dict]: A list of validated configuration entries, each containing:
-            - email (str): Recipient email address
             - search_url (str, optional): YouTube search URL
             - channel_id (str, optional): YouTube channel ID
             - channel_url (str, optional): YouTube channel URL
@@ -83,20 +81,10 @@ def load_email_list_config(config_path: str = "email_list.json") -> list[dict]:
         if not isinstance(entry, dict):
             raise ValueError(f"Entry at index {idx} must be an object")
 
-        email = entry.get("email")
         search_url = entry.get("search_url")
         channel_id = entry.get("channel_id")
         channel_url = entry.get("channel_url")
         channel_username = entry.get("channel_username")
-
-        if not email or not isinstance(email, str) or not email.strip():
-            logging.warning(f"Entry at index {idx} missing or invalid 'email' field")
-            continue
-
-        # Basic email format validation
-        if "@" not in email:
-            logging.warning(f"Entry at index {idx} has invalid email format")
-            continue
 
         # Validate that at least one source is provided (search_url OR channel)
         has_search_url = search_url and isinstance(search_url, str) and search_url.strip()
@@ -112,7 +100,7 @@ def load_email_list_config(config_path: str = "email_list.json") -> list[dict]:
             continue
 
         # Build validated entry
-        validated_entry = {"email": email.strip()}
+        validated_entry = {}
         # Additional checks help mypy understand these are not None
         if has_search_url and search_url:
             validated_entry["search_url"] = search_url.strip()
@@ -364,7 +352,7 @@ def save_results_to_json(results: list[dict], filename: str):
 
 def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2025-08-07") -> str:
     """
-    Sends transcript data to OpenAI to generate a newsletter digest.
+    Sends transcript data to OpenAI to generate a newsletter digest for each video.
 
     Args:
         json_data (list[dict]): The list of video dictionaries.
@@ -382,6 +370,10 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
         raise ValueError("OPENAI_API_KEY not found in environment variables")
 
     client = OpenAI(api_key=api_key)
+
+    # Truncate transcript to avoid overly long prompts and protect against large lists
+    # Limit to max 15000 characters per transcript to handle large queries.json files
+    max_transcript_length = 15000
 
     # Pre-process the data
     # We construct a string where we label every transcript clearly.
@@ -418,8 +410,8 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
                 segments.append(f"[{timestamp_seconds}s] {text} ")
 
             transcript_formatted = "".join(segments)
-            # Truncate to avoid overly long prompts, matching old-format behavior
-            transcript_formatted = transcript_formatted[:25000]
+            # Truncate to avoid overly long prompts
+            transcript_formatted = transcript_formatted[:max_transcript_length]
             context_block += f"Transcript (with timestamps in seconds): {transcript_formatted}\n\n"
         else:
             # Fallback for old format: plain text string (with type safety)
@@ -432,7 +424,7 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
                     item.get("video_id"),
                 )
                 safe_transcript = "" if transcript_data is None else str(transcript_data)
-            context_block += f"Transcript: {safe_transcript[:25000]}\n\n"
+            context_block += f"Transcript: {safe_transcript[:max_transcript_length]}\n\n"
 
     # Define the System Prompt
     system_prompt = (
@@ -492,108 +484,115 @@ def generate_newsletter_digest(json_data: list[dict], model: str = "gpt-5-mini-2
         raise RuntimeError("OpenAI API call failed")
 
 
-def markdown_to_email_html(md_content: str) -> str:
+def generate_rss_feed(summaries: list[dict], output_file: str = "feed.xml"):
     """
-    Converts Markdown to HTML with basic email styling.
+    Generates an RSS feed from video summaries and writes it to a file.
 
     Args:
-        md_content (str): The raw Markdown content.
-    Returns:
-        str: The HTML content suitable for email bodies.
+        summaries (list[dict]): List of dictionaries containing:
+            - title (str): Video title
+            - video_id (str): YouTube video ID
+            - summary (str): Markdown summary of the video
+            - timestamp (str): ISO 8601 timestamp for the entry
+        output_file (str): Path to output RSS file (default: "feed.xml")
+
+    The function overwrites the output file on each execution.
     """
-    html_content = markdown.markdown(md_content, extensions=["nl2br"])
+    # Create the root RSS element
+    rss = Element("rss", version="2.0", attrib={"xmlns:atom": "http://www.w3.org/2005/Atom"})
+    channel = SubElement(rss, "channel")
 
-    return textwrap.dedent(f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333333; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                h3 {{ color: #1a1a1a; margin-top: 20px; margin-bottom: 5px; }}
-                a {{ color: #0066cc; text-decoration: none; }}
-                a:hover {{ text-decoration: underline; }}
-                /* Ensure lists render cleanly */
-                ul {{ margin-top: 0; padding-left: 20px; margin-bottom: 20px; }}
-                li {{ margin-bottom: 5px; }}
-                hr {{ border: 0; border-top: 1px solid #eeeeee; margin: 20px 0; }}
-                .footer {{ font-size: 12px; color: #888888; margin-top: 30px; text-align: center; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                {html_content}
-                <div class="footer">
-                    <p>Generated by AI • Powered by Python</p>
-                </div>
-            </div>
-        </body>
-        </html>
-    """).strip()
+    # Add channel metadata
+    SubElement(channel, "title").text = "YouTube Digest Feed"
+    SubElement(channel, "link").text = "https://github.com/greenbrettmichael/yt-digest"
+    SubElement(channel, "description").text = "AI-powered summaries of YouTube videos"
+    SubElement(channel, "language").text = "en-us"
 
+    # Add atom:link for self-reference
+    SubElement(
+        channel,
+        "{http://www.w3.org/2005/Atom}link",
+        href=output_file,
+        rel="self",
+        type="application/rss+xml"
+    )
 
-def send_newsletter_resend(subject: str, body: str, recipients: list):
-    """
-    Sends the newsletter using the Resend API.
+    # Add each summary as an RSS item
+    for entry in summaries:
+        item = SubElement(channel, "item")
 
-    Args:
-        subject (str): The email subject line.
-        body (str): The email body content.
-        recipients (list): A list of email addresses to send to.
-    Raises:
-        RuntimeError: If sending the email fails.
-    """
-    api_key = os.getenv("RESEND_API_KEY")
-    # Resend requires a verified domain, or you can test using 'onboarding@resend.dev'
-    # to send ONLY to your own email address.
-    from_email = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+        SubElement(item, "title").text = entry["title"]
+        SubElement(item, "link").text = f"https://www.youtube.com/watch?v={entry['video_id']}"
+        SubElement(item, "guid", isPermaLink="false").text = entry["video_id"]
+        SubElement(item, "pubDate").text = entry["timestamp"]
 
-    if not api_key:
-        logging.warning("Skipping email: RESEND_API_KEY not set.")
-        return
+        # Truncate summary if too long (protect against excessive size)
+        summary = entry["summary"]
+        max_summary_length = 10000
+        if len(summary) > max_summary_length:
+            summary = summary[:max_summary_length] + "\n\n[Summary truncated due to length]"
 
-    if not recipients:
-        logging.warning("Skipping email: No recipients provided.")
-        return
+        # Use CDATA section for description to preserve formatting
+        description = SubElement(item, "description")
+        description.text = f"<![CDATA[{summary}]]>"
 
-    resend.api_key = api_key
-    html_body = markdown_to_email_html(body)
-
+    # Write to file (overwrite existing)
     try:
-        logging.info(f"Sending email via Resend to {len(recipients)} recipient(s)...")
+        # Format the XML with proper indentation
+        xml_str = _prettify_xml(rss)
 
-        params = {
-            "from": from_email,
-            "to": recipients,
-            "subject": subject,
-            "text": body,  # Plain text fallback for email clients that don't support HTML
-            "html": html_body,  # HTML version with styling for modern email clients
-        }
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+            f.write(xml_str)
 
-        # Resend library lacks complete type annotations for SendParams
-        email = resend.Emails.send(params)  # type: ignore[arg-type]
+        logging.info(f"Successfully wrote RSS feed with {len(summaries)} entries to {output_file}")
+    except OSError as e:
+        logging.error(f"Failed to write RSS feed to {output_file}: {type(e).__name__}: {e}")
+        raise
 
-        # Resend returns an object (or dict) containing the ID
-        if email and "id" in email:
-            logging.info(f"Email sent successfully! ID: {email['id']}")
-        else:
-            logging.error(f"Resend did not return an ID. Response: {email}")
-            raise RuntimeError(f"Resend did not return an ID. Response: {email}")
-    except Exception as e:
-        logging.error(f"Failed to send email via Resend: {e}")
-        raise RuntimeError(f"Resend Error: {e}")
+
+def _prettify_xml(elem: Element, level: int = 0) -> str:
+    """
+    Returns a pretty-printed XML string for the Element.
+
+    Args:
+        elem: XML Element to prettify
+        level: Current indentation level
+
+    Returns:
+        str: Formatted XML string
+    """
+    from xml.etree.ElementTree import tostring
+
+    indent = "  "
+    i = "\n" + level * indent
+    if len(elem):
+        if not elem.text or not elem.text.strip():
+            elem.text = i + indent
+        if not elem.tail or not elem.tail.strip():
+            elem.tail = i
+        for child in elem:
+            _prettify_xml(child, level + 1)
+        if not child.tail or not child.tail.strip():
+            child.tail = i
+    else:
+        if level and (not elem.tail or not elem.tail.strip()):
+            elem.tail = i
+
+    # Convert to string
+    return tostring(elem, encoding="unicode")
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     load_dotenv()
 
-    # Try to load configuration from email_list.json
-    config_file = "email_list.json"
+    # Try to load configuration from queries.json
+    config_file = "queries.json"
     config_entries = []
 
     try:
-        config_entries = load_email_list_config(config_file)
+        config_entries = load_queries_config(config_file)
         logging.info(f"Using configuration from {config_file}")
         if not config_entries:
             logging.error(f"No valid configuration entries found in {config_file}")
@@ -602,9 +601,11 @@ if __name__ == "__main__":
         logging.error(f"Failed to load configuration: {e}")
         exit(1)
 
+    # Collect all summaries for RSS feed
+    all_summaries = []
+
     # Process each configuration entry
     for idx, entry in enumerate(config_entries):
-        recipient_email = entry["email"]
         search_url = entry.get("search_url")
         channel_id = entry.get("channel_id")
         channel_url = entry.get("channel_url")
@@ -612,7 +613,6 @@ if __name__ == "__main__":
 
         logging.info(f"\n{'=' * 60}")
         logging.info(f"Processing entry {idx + 1}/{len(config_entries)}")
-        logging.info(f"Recipient: {recipient_email}")
         if search_url:
             logging.info(f"Search URL: {search_url}")
         if channel_id:
@@ -638,18 +638,38 @@ if __name__ == "__main__":
                 data.extend(search_data)
 
             if not data:
-                logging.warning(f"No transcripts found for {recipient_email}, skipping...")
+                logging.warning(f"No transcripts found for entry {idx + 1}, skipping...")
                 continue
 
-            # Generate newsletter digest
-            newsletter = generate_newsletter_digest(data)
+            # Generate newsletter digest for each video individually to ensure one entry per video
+            for video in data:
+                # Generate summary for single video
+                single_video_data = [video]
+                try:
+                    summary = generate_newsletter_digest(single_video_data)
 
-            # Send email
-            send_newsletter_resend(subject="YT DIGEST", body=newsletter, recipients=[recipient_email])
+                    summary_entry = {
+                        "title": video["title"],
+                        "video_id": video["video_id"],
+                        "summary": summary,
+                        "timestamp": datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
+                    }
+                    all_summaries.append(summary_entry)
+                    logging.info(f"Generated summary for: {video['title']}")
+                except Exception as e:
+                    logging.error(f"Error generating summary for {video['title']}: {e}")
+                    continue
 
-            logging.info(f"Successfully processed entry for {recipient_email}\n")
+            logging.info(f"Successfully processed entry {idx + 1}\n")
 
         except Exception as e:
-            logging.error(f"Error processing entry for {recipient_email}: {e}")
+            logging.error(f"Error processing entry {idx + 1}: {e}")
             logging.info("Continuing with next entry...\n")
             continue
+
+    # Generate RSS feed with all summaries
+    if all_summaries:
+        generate_rss_feed(all_summaries, output_file="feed.xml")
+        logging.info(f"\nRSS feed generation complete! Total entries: {len(all_summaries)}")
+    else:
+        logging.warning("No summaries generated. RSS feed not created.")
