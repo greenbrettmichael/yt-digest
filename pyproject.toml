@@ -31,8 +31,8 @@ select = [
 # Ignore specific rules if needed
 ignore = [
     "E501",  # Line too long (handled by formatter)
-    "E722",  # Bare except (to be fixed in future)
-    "B904",  # Raise from (to be fixed in future)
+    "E722",  # Bare except
+    "B904",  # Raise from
 ]
 
 [tool.ruff.lint.isort]

@@ -2,6 +2,8 @@
 
 A YouTube transcript digest generator that searches for YouTube videos, extracts transcripts, and generates AI-powered summaries using OpenAI's GPT models. The tool outputs summaries to an RSS feed for easy consumption in your favorite RSS reader.
 
+> **Maintenance Mode**: This project has reached maturity and is now in maintenance mode. It is stable and feature-complete for its intended use case. While critical bug fixes and security updates will be addressed, no major new features are planned. The project remains actively maintained and ready for use.
+
 ## Local Setup
 
 ### Prerequisites
@@ -53,17 +55,19 @@ Before setting up the project, ensure you have the following installed:
 
 ### Troubleshooting
 
-**Issue: Conda environment creation fails**
-- Ensure you have Conda installed and updated: `conda update conda`
+**Conda environment creation fails**
+- Ensure Conda is installed and updated: `conda update conda`
 - Try creating the environment with: `conda env create -f environment.yaml --force`
 
-**Issue: Proxy authentication errors**
-- Verify your Webshare proxy credentials are correct
+**Proxy authentication errors**
+- Verify your Webshare proxy credentials are correct in `.env`
 - Ensure your proxy subscription is active
 
-**Issue: OpenAI API errors**
+**OpenAI API errors**
 - Check that your API key is valid and has available credits
 - Verify the model name in the code matches available models in your OpenAI account
+
+For more detailed troubleshooting and advanced configuration, see the [Advanced Usage Guide](ADVANCED_USAGE.md).
 
 ## Basic Usage
 
@@ -172,145 +176,16 @@ The `yt-digest` tool provides several key functions:
    - Compatible with all standard RSS readers
    - Summaries are truncated to 10,000 characters to prevent excessive size
 
-### Customizing the Script
+## Additional Documentation
 
-**For advanced users:** You can modify the behavior by editing `app.py`:
+- **[Advanced Usage Guide](ADVANCED_USAGE.md)** - Customization options, advanced workflows, and programmatic usage examples
+- **[Development Guide](DEVELOPMENT.md)** - Setup instructions, code quality tools, and contribution guidelines
+- **[Deployment Guide](DEPLOYMENT.md)** - AWS Fargate deployment instructions for production use
 
-```python
-# Adjust number of videos to process per search query (default: 2)
-data = get_recent_transcripts(search_url, limit=5)
+## Contributing
 
-# Customize OpenAI model (default: "gpt-5-mini-2025-08-07")
-newsletter = generate_newsletter_digest(data, model="gpt-4-turbo-preview")
+This project is in maintenance mode but we still welcome contributions for bug fixes and security updates. Please see the [Development Guide](DEVELOPMENT.md) for information on setting up your development environment and code quality standards.
 
-# Customize RSS feed output file name (default: "feed.xml")
-generate_rss_feed(all_summaries, output_file="my_custom_feed.xml")
-```
+## License
 
-### Example Usage Workflows
-
-**Workflow 1: Generate summaries and RSS feed**
-```python
-import logging
-from app import get_recent_transcripts, generate_newsletter_digest, generate_rss_feed
-from datetime import datetime
-
-logging.basicConfig(level=logging.INFO)
-
-# Search and extract transcripts using a full YouTube URL
-url = "https://www.youtube.com/results?search_query=Python+tutorials&sp=EgIIAw%253D%253D"
-data = get_recent_transcripts(url, limit=3)
-
-# Generate summaries for each video
-all_summaries = []
-for video in data:
-    summary = generate_newsletter_digest([video])
-    all_summaries.append({
-        "title": video["title"],
-        "video_id": video["video_id"],
-        "summary": summary,
-        "timestamp": datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
-    })
-
-# Generate RSS feed
-generate_rss_feed(all_summaries, output_file="feed.xml")
-```
-
-**Workflow 2: Generate digest without RSS feed**
-```python
-from app import get_recent_transcripts, save_results_to_json, generate_newsletter_digest
-
-# Search and extract transcripts
-url = "https://www.youtube.com/results?search_query=Python+tutorials&sp=EgIIAw%253D%253D"
-data = get_recent_transcripts(url, limit=3)
-
-# Save raw data
-save_results_to_json(data, "python_transcripts.json")
-
-# Generate digest
-newsletter = generate_newsletter_digest(data)
-
-# Save to file
-with open("python_digest.md", "w") as f:
-    f.write(newsletter)
-```
-
-### Command-Line Help
-
-For more details on individual functions, refer to their docstrings:
-
-```bash
-python -c "from app import get_recent_transcripts; help(get_recent_transcripts)"
-```
-
-## Development
-
-### Code Quality
-
-This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and code formatting, [Flake8](https://flake8.pycqa.org/) for additional style checking, and [mypy](http://mypy-lang.org/) for static type checking.
-
-#### Running Ruff
-
-To check your code for linting issues:
-
-```bash
-ruff check .
-```
-
-To automatically fix auto-fixable issues:
-
-```bash
-ruff check --fix .
-```
-
-To format your code:
-
-```bash
-ruff format .
-```
-
-#### Ruff Configuration
-
-Ruff is configured via `pyproject.toml` in the project root. The configuration includes:
-- Line length limit: 120 characters
-- Python version target: 3.10
-- Enabled rule sets: pycodestyle, pyflakes, isort, pep8-naming, pyupgrade, flake8-bugbear, flake8-comprehensions, and flake8-simplify
-
-#### Running Flake8
-
-To check your code for style and formatting issues:
-
-```bash
-flake8 .
-```
-
-#### Flake8 Configuration
-
-Flake8 is configured via `.flake8` in the project root. The configuration includes:
-- Line length limit: 120 characters
-- Excludes: `.git`, `.pytest_cache`, `__pycache__`, and other build/environment directories
-- Some rules are ignored to align with the project's code style (E501, E722, W503)
-
-#### Running mypy
-
-To check your code for type errors:
-
-```bash
-mypy app.py tests/
-```
-
-#### mypy Configuration
-
-mypy is configured via `pyproject.toml` in the project root. The configuration includes:
-- Python version target: 3.10
-- Type checking for untyped code enabled
-- No implicit optional types allowed
-- Third-party libraries without type stubs (scrapetube, resend) are configured to ignore missing imports
-
-### Testing
-
-Run tests using pytest:
-
-```bash
-pytest -v
-```
+This project is open source. Please refer to the repository for license information.
