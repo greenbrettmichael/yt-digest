@@ -51,7 +51,5 @@ no_implicit_optional = true
 [[tool.mypy.overrides]]
 module = [
     "scrapetube",
-    "resend",
-    "resend.*",
 ]
 ignore_missing_imports = true

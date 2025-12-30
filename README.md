@@ -1,6 +1,6 @@
 # yt-digest
 
-A YouTube transcript digest generator that searches for YouTube videos, extracts transcripts, and generates AI-powered newsletter digests using OpenAI's GPT models. The tool can automatically send formatted newsletters via email.
+A YouTube transcript digest generator that searches for YouTube videos, extracts transcripts, and generates AI-powered summaries using OpenAI's GPT models. The tool outputs summaries to an RSS feed for easy consumption in your favorite RSS reader.
 
 ## Local Setup
 
@@ -11,9 +11,8 @@ Before setting up the project, ensure you have the following installed:
 - **Python 3.10**: This project requires Python 3.10 or higher
 - **Conda**: For managing the Python environment ([Installation Guide](https://docs.conda.io/projects/conda/en/latest/user-guide/install/))
 - **API Keys**: You'll need API keys for the following services:
-  - [OpenAI API Key](https://platform.openai.com/api-keys) - For generating newsletter digests
+  - [OpenAI API Key](https://platform.openai.com/api-keys) - For generating video summaries
   - [Webshare Proxy](https://www.webshare.io/) credentials - For accessing YouTube transcripts (username and password)
-  - [Resend API Key](https://resend.com/api-keys) - For sending email newsletters
 
 ### Installation
 
@@ -33,7 +32,6 @@ Before setting up the project, ensure you have the following installed:
    - `scrapetube` - For searching YouTube videos
    - `youtube-transcript-api` - For fetching video transcripts
    - `openai` - For generating AI-powered digests
-   - `resend` - For sending email newsletters
    - `pytest` and `ruff` - For testing and linting
 
 3. **Configure environment variables**:
@@ -51,11 +49,6 @@ Before setting up the project, ensure you have the following installed:
    
    # OpenAI API Key
    OPENAI_API_KEY=sk-your-openai-api-key
-   
-   # Resend Configuration
-   RESEND_API_KEY=re_your-resend-api-key
-   # Use 'onboarding@resend.dev' to test without a custom domain
-   RESEND_FROM_EMAIL=onboarding@resend.dev
    ```
 
 ### Troubleshooting
@@ -72,37 +65,27 @@ Before setting up the project, ensure you have the following installed:
 - Check that your API key is valid and has available credits
 - Verify the model name in the code matches available models in your OpenAI account
 
-**Issue: Email sending fails**
-- Ensure RESEND_API_KEY is set correctly
-- When testing, use `onboarding@resend.dev` as the FROM_EMAIL
-- Check that the recipient email is valid
-
 ## Basic Usage
 
-### Configuration Using email_list.json
+### Configuration Using queries.json
 
-Create an `email_list.json` file in the project root directory with the following structure:
+Create a `queries.json` file in the project root directory with the following structure:
 
 ```json
 [
     {
-        "email": "user1@example.com",
         "search_url": "https://www.youtube.com/results?search_query=python+tutorials&sp=EgIIAw%253D%253D"
     },
     {
-        "email": "user2@example.com",
         "channel_username": "LinusTechTips"
     },
     {
-        "email": "user3@example.com",
         "channel_id": "UC8butISFwT-Wl7EV0hUK0BQ"
     },
     {
-        "email": "user4@example.com",
         "channel_url": "https://www.youtube.com/@mkbhd"
     },
     {
-        "email": "user5@example.com",
         "channel_username": "ThePrimeagen",
         "search_url": "https://www.youtube.com/results?search_query=programming&sp=EgIIAw%253D%253D"
     }
@@ -111,9 +94,8 @@ Create an `email_list.json` file in the project root directory with the followin
 
 **Configuration File Format:**
 - The file must be a JSON array of objects
-- Each object represents a recipient and their video sources
+- Each object represents a video source query
 - Required fields for each entry:
-  - `email`: Recipient email address (must contain '@')
   - At least one video source (can have multiple):
     - `search_url`: Full YouTube search URL for keyword-based searches
     - `channel_id`: YouTube channel ID (e.g., "UC8butISFwT-Wl7EV0hUK0BQ")
@@ -124,8 +106,8 @@ Create an `email_list.json` file in the project root directory with the followin
 - When you specify a channel (via `channel_id`, `channel_url`, or `channel_username`), the tool will:
   - Query the channel for videos published in the last 24 hours
   - Process transcripts for all videos found
-  - Include them in the newsletter digest
-- You can specify multiple sources per recipient (e.g., both a channel and a search URL)
+  - Include them in the RSS feed
+- You can specify multiple sources per query (e.g., both a channel and a search URL)
 - Channel videos are fetched using `scrapetube.get_channel()` sorted by newest first
 
 **How to Construct YouTube Search URLs:**
@@ -139,7 +121,7 @@ Create an `email_list.json` file in the project root directory with the followin
 - **Channel URL**: The full URL to the channel page, e.g., "https://www.youtube.com/@mkbhd"
 - **Channel ID**: Found in the page source or channel URL, e.g., "UC8butISFwT-Wl7EV0hUK0BQ"
 
-**Example:** An `email_list.json.example` file is provided in the repository for reference.
+**Example:** A `queries.json.example` file is provided in the repository for reference.
 
 ### Running the Main Script
 
@@ -153,10 +135,21 @@ python app.py
 - For each entry, it will:
   1. Fetch videos from the last 24 hours from any specified channels
   2. Fetch transcripts for videos matching any search URLs
-  3. Generate an AI newsletter digest
-  4. Send the personalized newsletter to the recipient email
+  3. Generate an AI summary for each video individually
+  4. Add each summary as a separate entry to the RSS feed
+- The RSS feed is written to `feed.xml` in the project root
+- Each execution overwrites the previous `feed.xml` with newly generated content
 - If any entry fails, the application logs the error and continues with the next entry
 - The tool logs the number of videos found and which channels were processed
+
+### RSS Feed Output
+
+The generated `feed.xml` file:
+- Contains one RSS item per video summary
+- Includes video title, YouTube link, publication date, and AI-generated summary
+- Is compatible with standard RSS readers (Feedly, Inoreader, etc.)
+- Summaries are truncated to 10,000 characters if too long to protect against excessive size
+- The feed is completely regenerated on each run (previous entries are overwritten)
 
 ### Core Functionality
 
@@ -169,36 +162,65 @@ The `yt-digest` tool provides several key functions:
 
 2. **AI-Powered Digest Generation**:
    - Uses OpenAI's GPT models to analyze transcripts
-   - Generates concise, structured newsletter format
-   - Includes video titles, links, and key takeaways
+   - Generates concise, structured summaries for each video
+   - Includes video titles, links, and key takeaways with timestamps
+   - Transcripts are truncated to 15,000 characters to handle large queries efficiently
 
-3. **Email Newsletter Distribution**:
-   - Converts Markdown to HTML email format
-   - Sends newsletters via Resend API
-   - Supports plain text fallback
+3. **RSS Feed Generation**:
+   - Outputs all summaries to a single `feed.xml` file
+   - Each video gets its own RSS item entry
+   - Compatible with all standard RSS readers
+   - Summaries are truncated to 10,000 characters to prevent excessive size
 
 ### Customizing the Script
 
 **For advanced users:** You can modify the behavior by editing `app.py`:
 
 ```python
-# Adjust number of videos to process per recipient (default: 2)
+# Adjust number of videos to process per search query (default: 2)
 data = get_recent_transcripts(search_url, limit=5)
 
 # Customize OpenAI model (default: "gpt-5-mini-2025-08-07")
 newsletter = generate_newsletter_digest(data, model="gpt-4-turbo-preview")
+
+# Customize RSS feed output file name (default: "feed.xml")
+generate_rss_feed(all_summaries, output_file="my_custom_feed.xml")
 ```
 
 ### Example Usage Workflows
 
-**Workflow 1: Generate a digest without sending email**
+**Workflow 1: Generate summaries and RSS feed**
 ```python
 import logging
-from app import get_recent_transcripts, save_results_to_json, generate_newsletter_digest
+from app import get_recent_transcripts, generate_newsletter_digest, generate_rss_feed
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 
 # Search and extract transcripts using a full YouTube URL
+url = "https://www.youtube.com/results?search_query=Python+tutorials&sp=EgIIAw%253D%253D"
+data = get_recent_transcripts(url, limit=3)
+
+# Generate summaries for each video
+all_summaries = []
+for video in data:
+    summary = generate_newsletter_digest([video])
+    all_summaries.append({
+        "title": video["title"],
+        "video_id": video["video_id"],
+        "summary": summary,
+        "timestamp": datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
+    })
+
+# Generate RSS feed
+generate_rss_feed(all_summaries, output_file="feed.xml")
+```
+
+**Workflow 2: Generate digest without RSS feed**
+```python
+from app import get_recent_transcripts, save_results_to_json, generate_newsletter_digest
+
+# Search and extract transcripts
 url = "https://www.youtube.com/results?search_query=Python+tutorials&sp=EgIIAw%253D%253D"
 data = get_recent_transcripts(url, limit=3)
 
@@ -211,17 +233,6 @@ newsletter = generate_newsletter_digest(data)
 # Save to file
 with open("python_digest.md", "w") as f:
     f.write(newsletter)
-```
-
-**Workflow 2: Send a custom newsletter**
-```python
-from app import send_newsletter_resend
-
-subject = "Weekly Tech Digest"
-body = "# Your newsletter content here\n\n- Item 1\n- Item 2"
-recipients = ["subscriber1@example.com", "subscriber2@example.com"]
-
-send_newsletter_resend(subject, body, recipients)
 ```
 
 ### Command-Line Help

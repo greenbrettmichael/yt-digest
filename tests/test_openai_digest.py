@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app import generate_newsletter_digest
+from app import generate_video_summary
 
 
 class TestNewsletterGeneration:
@@ -16,7 +16,7 @@ class TestNewsletterGeneration:
         fake_data = [{"title": "Test", "video_id": "1", "transcript": "Content"}]
 
         with pytest.raises(ValueError, match="OPENAI_API_KEY not found"):
-            generate_newsletter_digest(fake_data)
+            generate_video_summary(fake_data)
 
     @patch("app.OpenAI")
     def test_generate_newsletter_success(self, mock_openai_class, monkeypatch):
@@ -31,7 +31,7 @@ class TestNewsletterGeneration:
         mock_client = mock_openai_class.return_value
         mock_response = MagicMock()
         mock_response.choices[0].message.content = (
-            "### Title: Test\nLink: [Watch on YouTube](https://...)\nKey Takeaways:\n\n- Point 1"
+            "Key Takeaways:\n\n- **[00:12](https://www.youtube.com/watch?v=vid123&t=12s)** - Point 1"
         )
         mock_client.chat.completions.create.return_value = mock_response
 
@@ -40,10 +40,10 @@ class TestNewsletterGeneration:
 
         # 3. Call the function
         # We allow the default model to be used to test the default parameter
-        result = generate_newsletter_digest(fake_data)
+        result = generate_video_summary(fake_data)
 
         # 4. Assertions
-        assert "### Title: Test" in result
+        assert "Key Takeaways:" in result
 
         # Verify the API was initialized with the key
         mock_openai_class.assert_called_with(api_key="fake-test-key")
@@ -61,11 +61,11 @@ class TestNewsletterGeneration:
         assert "expert tech newsletter editor" in messages[0]["content"]
         assert messages[1]["role"] == "user"
         # Check for specific formatting rules we added
-        assert "Do NOT include a main headline" in messages[1]["content"]
+        assert "Do NOT include a title, headline" in messages[1]["content"]
         assert "Provide between 2 and 5 bullet points" in messages[1]["content"]
         # Check that our data was injected
         assert "Video ID: vid123" in messages[1]["content"]
-        assert "[Watch on YouTube]" in result
+        assert "[Watch on YouTube]" in result or "Key Takeaways" in result
 
     @patch("app.OpenAI")
     def test_api_failure_raises_runtime_error(self, mock_openai_class, monkeypatch, caplog):
@@ -83,7 +83,7 @@ class TestNewsletterGeneration:
 
         # 2. Call and Assert
         with pytest.raises(RuntimeError, match="OpenAI API call failed"):
-            generate_newsletter_digest(fake_data)
+            generate_video_summary(fake_data)
 
         # 3. Verify logging
         assert "OpenAI API call failed: Rate Limit Exceeded" in caplog.text
@@ -98,7 +98,7 @@ class TestNewsletterGeneration:
         mock_response.choices[0].message.content = "Success"
         mock_client.chat.completions.create.return_value = mock_response
 
-        generate_newsletter_digest([], model="gpt-4o-custom")
+        generate_video_summary([], model="gpt-4o-custom")
 
         # Check that the specific model was passed to the API
         call_args = mock_client.chat.completions.create.call_args
@@ -127,7 +127,7 @@ class TestNewsletterGeneration:
             }
         ]
 
-        generate_newsletter_digest(fake_data)
+        generate_video_summary(fake_data)
 
         # Verify the prompt includes timestamp instructions
         call_args = mock_client.chat.completions.create.call_args
@@ -157,7 +157,7 @@ class TestNewsletterGeneration:
         # Test data with old string format
         fake_data = [{"title": "Test", "video_id": "123", "transcript": "This is plain text"}]
 
-        generate_newsletter_digest(fake_data)
+        generate_video_summary(fake_data)
 
         # Verify it doesn't crash and uses the fallback
         call_args = mock_client.chat.completions.create.call_args

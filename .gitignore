@@ -1,3 +1,5 @@
 .env
 __pycache__/
 email_list.json
+queries.json
+feed.xml
