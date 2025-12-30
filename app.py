@@ -113,6 +113,7 @@ def load_email_list_config(config_path: str = "email_list.json") -> list[dict]:
 
         # Build validated entry
         validated_entry = {"email": email.strip()}
+        # Additional checks help mypy understand these are not None
         if has_search_url and search_url:
             validated_entry["search_url"] = search_url.strip()
         if has_channel_id and channel_id:
@@ -192,6 +193,8 @@ def get_channel_videos_last_day(
 
     try:
         # Get videos from the channel, sorted by newest first
+        # Note: Using scrapetube.get_channel() (top-level API) instead of
+        # scrapetube.scrapetube.get_videos() (lower-level function) for channel queries
         channel_videos = scrapetube.get_channel(
             channel_id=channel_id,
             channel_url=channel_url,
